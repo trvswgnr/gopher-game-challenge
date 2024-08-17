@@ -19,12 +19,14 @@ import (
 var assets embed.FS
 
 const (
-	screenWidth       int     = 1024
-	screenHeight      int     = 768
-	playerSpeed       float64 = 0.08
-	playerRotateSpeed float64 = 0.07
-	enemySpeed        float64 = 0.03
-	enemyRotateSpeed  float64 = 0.07
+	screenWidth                 int     = 1024
+	screenHeight                int     = 768
+	playerSpeedStanding         float64 = 0.08
+	playerSpeedCrouching        float64 = 0.01
+	playerRotateSpeed           float64 = 0.07
+	playerStandingHeightOffset  float64 = 0.1
+	playerCrouchingHeightOffset float64 = 0.6
+	playerCrouchingSpeed        float64 = 0.03
 )
 
 type Game struct {
@@ -35,15 +37,31 @@ type Game struct {
 }
 
 type Enemy struct {
-	x, y           float64
-	dirx, diry     float64
-	planeX, planeY float64
+	x, y float64
 }
 
 type Player struct {
 	x, y           float64
 	dirX, dirY     float64
 	planeX, planeY float64
+	heightOffset   float64
+	isCrouching    bool
+	speed          float64
+}
+
+func NewPlayer(x, y float64) Player {
+	offsetX, offsetY := 0.5, 0.5 // offset to center the player in the tile
+	return Player{
+		x:            x + offsetX,
+		y:            y + offsetY,
+		dirX:         -1,
+		dirY:         0,
+		planeX:       0,
+		planeY:       0.66,
+		heightOffset: playerStandingHeightOffset,
+		isCrouching:  false,
+		speed:        playerSpeedStanding,
+	}
 }
 
 func NewGame() *Game {
@@ -53,14 +71,7 @@ func NewGame() *Game {
 	}
 	level := NewLevel(file)
 	playerX, playerY := level.GetPlayer()
-	player := Player{
-		x:      playerX + 0.5,
-		y:      playerY + 0.5,
-		dirX:   -1,
-		dirY:   0,
-		planeX: 0,
-		planeY: 0.66,
-	}
+	player := NewPlayer(playerX, playerY)
 	enemies := level.GetEnemies()
 	g := &Game{
 		player:  player,
@@ -94,15 +105,24 @@ func (g *Game) Update() error {
 
 func (g *Game) handleInput() {
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.movePlayer(playerSpeed)
+		g.movePlayer(g.player.speed)
 	} else if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.movePlayer(-playerSpeed)
+		g.movePlayer(-g.player.speed)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		g.rotatePlayer(-playerRotateSpeed)
 	} else if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		g.rotatePlayer(playerRotateSpeed)
+	}
+
+	g.player.isCrouching = ebiten.IsKeyPressed(ebiten.KeyC)
+	if g.player.isCrouching {
+		g.player.speed = playerSpeedCrouching
+		g.adjustPlayerHeightOffset(playerCrouchingSpeed)
+	} else {
+		g.player.speed = playerSpeedStanding
+		g.adjustPlayerHeightOffset(-playerCrouchingSpeed)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
@@ -268,8 +288,12 @@ func (g *Game) drawEntities(screen *ebiten.Image, x int, entities []struct {
 
 func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, int, int) {
 	lineHeight := int(float64(screenHeight) / dist)
-	drawStart := -lineHeight/2 + screenHeight/2
-	drawEnd := lineHeight/2 + screenHeight/2
+
+	// Adjust the vertical position based on player height
+	heightOffset := int((0.5 - g.player.heightOffset) * float64(screenHeight) / dist)
+
+	drawStart := -lineHeight/2 + screenHeight/2 + heightOffset
+	drawEnd := lineHeight/2 + screenHeight/2 + heightOffset
 
 	if entity == LevelEntity_Wall {
 		factor := 2.0
@@ -285,6 +309,16 @@ func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, i
 	}
 
 	return lineHeight, drawStart, drawEnd
+}
+
+func (g *Game) adjustPlayerHeightOffset(delta float64) {
+	g.player.heightOffset += delta
+	// clamp the height
+	if g.player.heightOffset > playerCrouchingHeightOffset {
+		g.player.heightOffset = playerCrouchingHeightOffset
+	} else if g.player.heightOffset < playerStandingHeightOffset {
+		g.player.heightOffset = playerStandingHeightOffset
+	}
 }
 
 func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
@@ -348,6 +382,8 @@ func (g *Game) drawUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()), 10, 10)
 	ebitenutil.DebugPrintAt(screen, "move with arrow keys", 10, screenHeight-40)
 	ebitenutil.DebugPrintAt(screen, "ESC to exit", 10, screenHeight-20)
+
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("height offset: %0.2f", g.player.heightOffset), 10, screenHeight-60)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
