@@ -29,14 +29,16 @@ const (
 )
 
 type Game struct {
-	player  Player
-	enemies []Enemy
-	minimap *ebiten.Image
-	level   Level
+	player   Player
+	enemies  []Enemy
+	minimap  *ebiten.Image
+	level    Level
+	gameOver bool
 }
 
 type Enemy struct {
-	x, y float64
+	x, y           float64
+	watchingPlayer bool
 }
 
 type Player struct {
@@ -73,10 +75,11 @@ func NewGame() *Game {
 	player := NewPlayer(playerX, playerY)
 	enemies := level.GetEnemies()
 	g := &Game{
-		player:  player,
-		minimap: ebiten.NewImage(level.Width()*4, level.Height()*4),
-		level:   level,
-		enemies: enemies,
+		player:   player,
+		minimap:  ebiten.NewImage(level.Width()*4, level.Height()*4),
+		level:    level,
+		enemies:  enemies,
+		gameOver: false,
 	}
 
 	g.generateStaticMinimap()
@@ -96,13 +99,47 @@ func (g *Game) generateStaticMinimap() {
 	}
 }
 
+var watchCounter int = 0
+var watchTimer int = 0
+
 func (g *Game) Update() error {
+	if g.gameOver {
+		if ebiten.IsKeyPressed(ebiten.KeySpace) {
+			// Reset the game
+			*g = *NewGame()
+		}
+		return nil
+	}
+
+	watchCounter++
+
+	if watchCounter > 200 {
+		watchTimer = 100
+		watchCounter = 0
+	}
+
+	if watchTimer > 0 {
+		watchTimer--
+	}
+
+	for i, _ := range g.enemies {
+		g.enemies[i].watchingPlayer = watchTimer > 0
+	}
+
 	g.handleInput()
+
+	// Check if player is in enemy's line of sight
+	if g.isPlayerInEnemySight() {
+		g.gameOver = true
+	}
 
 	return nil
 }
-
 func (g *Game) handleInput() {
+	if g.gameOver {
+		return
+	}
+
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
 		g.movePlayer(g.player.speed)
 	} else if ebiten.IsKeyPressed(ebiten.KeyDown) {
@@ -170,11 +207,72 @@ func (g *Game) rotatePlayer(angle float64) {
 	g.player.planeY = oldPlaneX*math.Sin(angle) + g.player.planeY*math.Cos(angle)
 }
 
+func (g *Game) isPlayerInEnemySight() bool {
+	for i, enemy := range g.enemies {
+		if !g.enemies[i].watchingPlayer {
+			continue
+		}
+		// Calculate direction from enemy center to player center
+		enemyCenterX := enemy.x + 0.5
+		enemyCenterY := enemy.y + 0.5
+		playerCenterX := g.player.x + 0.5
+		playerCenterY := g.player.y + 0.5
+
+		dirX := playerCenterX - enemyCenterX
+		dirY := playerCenterY - enemyCenterY
+		distance := math.Sqrt(dirX*dirX + dirY*dirY)
+
+		// Normalize direction
+		dirX /= distance
+		dirY /= distance
+
+		// Cast a ray from the enemy center to the player center
+		stepX, stepY := dirX*0.05, dirY*0.05 // Use smaller steps for more precision
+		curX, curY := enemyCenterX, enemyCenterY
+
+		for i := 0; i < int(distance*20); i++ {
+			curX += stepX
+			curY += stepY
+
+			mapX, mapY := int(curX), int(curY)
+
+			// Check if we've hit a wall or construct
+			entity := g.level.GetEntityAt(mapX, mapY)
+			if entity == LevelEntity_Wall {
+				// Wall blocks line of sight
+				break
+			} else if entity == LevelEntity_Construct {
+				// If player is crouching behind a construct, they're safe
+				if g.player.isCrouching && math.Abs(curX-playerCenterX) > 0.5 && math.Abs(curY-playerCenterY) > 0.5 {
+					break
+				}
+			}
+
+			// Check if we've reached the player
+			if math.Abs(curX-playerCenterX) < 0.5 && math.Abs(curY-playerCenterY) < 0.5 {
+				// We've reached the player without hitting a wall or construct
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
+	if g.gameOver {
+		g.drawGameOver(screen)
+		return
+	}
+
 	g.drawFloorAndCeiling(screen)
 	g.drawBlocks(screen)
 	g.drawMinimap(screen)
 	g.drawUI(screen)
+}
+
+func (g *Game) drawGameOver(screen *ebiten.Image) {
+	ebitenutil.DebugPrintAt(screen, "GAME OVER", screenWidth/2-40, screenHeight/2-10)
+	ebitenutil.DebugPrintAt(screen, "Press SPACE to restart", screenWidth/2-80, screenHeight/2+10)
 }
 
 func (g *Game) drawFloorAndCeiling(screen *ebiten.Image) {
@@ -361,6 +459,8 @@ func (g *Game) drawMinimap(screen *ebiten.Image) {
 
 	g.drawPlayerOnMinimap(screen)
 	g.drawEnemiesOnMinimap(screen)
+
+	g.drawEnemyLinesOfSight(screen)
 }
 
 func (g *Game) drawPlayerOnMinimap(screen *ebiten.Image) {
@@ -387,12 +487,44 @@ func (g *Game) drawEnemiesOnMinimap(screen *ebiten.Image) {
 	}
 }
 
+func (g *Game) drawEnemyLinesOfSight(screen *ebiten.Image) {
+	for i, enemy := range g.enemies {
+		if !g.enemies[i].watchingPlayer {
+			continue
+		}
+		// Calculate direction from enemy to player
+		dirX := g.player.x - enemy.x
+		dirY := g.player.y - enemy.y
+		distance := math.Sqrt(dirX*dirX + dirY*dirY)
+
+		// Normalize direction
+		dirX /= distance
+		dirY /= distance
+
+		// Draw line of sight
+		startX := float32(screenWidth - g.level.Width()*4 - 10 + int(enemy.x*4))
+		startY := float32(10 + int(enemy.y*4))
+		endX := float32(screenWidth - g.level.Width()*4 - 10 + int((enemy.x+dirX*distance)*4))
+		endY := float32(10 + int((enemy.y+dirY*distance)*4))
+
+		vector.StrokeLine(screen, startX, startY, endX, endY, 1, color.RGBA{255, 255, 0, 128}, false)
+	}
+}
+
 func (g *Game) drawUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()), 10, 10)
 	ebitenutil.DebugPrintAt(screen, "move with arrow keys", 10, screenHeight-40)
 	ebitenutil.DebugPrintAt(screen, "ESC to exit", 10, screenHeight-20)
 
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("height offset: %0.2f", g.player.heightOffset), 10, screenHeight-60)
+
+	crouchStatus := "Standing"
+	if g.player.isCrouching {
+		crouchStatus = "Crouching"
+	}
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Status: %s", crouchStatus), 10, screenHeight-80)
+
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("watch timer: %d", watchTimer), 10, screenHeight-100)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
