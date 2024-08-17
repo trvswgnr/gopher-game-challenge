@@ -1,11 +1,10 @@
+// main.go
 package main
 
 import (
 	"embed"
 	"fmt"
-	"image"
 	"image/color"
-	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -24,7 +23,7 @@ const (
 	playerSpeedStanding         float64 = 0.08
 	playerSpeedCrouching        float64 = 0.01
 	playerRotateSpeed           float64 = 0.07
-	playerStandingHeightOffset  float64 = 0.1
+	playerStandingHeightOffset  float64 = 0.2
 	playerCrouchingHeightOffset float64 = 0.6
 	playerCrouchingSpeed        float64 = 0.03
 )
@@ -289,14 +288,22 @@ func (g *Game) drawEntities(screen *ebiten.Image, x int, entities []struct {
 func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, int, int) {
 	lineHeight := int(float64(screenHeight) / dist)
 
-	// Adjust the vertical position based on player height
+	// adjust the vertical position based on player height
 	heightOffset := int((0.5 - g.player.heightOffset) * float64(screenHeight) / dist)
 
 	drawStart := -lineHeight/2 + screenHeight/2 + heightOffset
 	drawEnd := lineHeight/2 + screenHeight/2 + heightOffset
 
+	// make walls taller
 	if entity == LevelEntity_Wall {
 		factor := 2.0
+		lineHeight = int(float64(lineHeight) * factor)
+		drawStart = drawEnd - lineHeight
+	}
+
+	// make constructs shorter
+	if entity == LevelEntity_Construct {
+		factor := 0.8
 		lineHeight = int(float64(lineHeight) * factor)
 		drawStart = drawEnd - lineHeight
 	}
@@ -327,11 +334,13 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 	case LevelEntity_Wall:
 		entityColor = color.RGBA{100, 100, 100, 255}
 	case LevelEntity_Enemy:
-		entityColor = color.RGBA{58, 231, 144, 255}
+		entityColor = color.RGBA{198, 54, 54, 255}
 	case LevelEntity_Exit:
-		entityColor = color.RGBA{95, 158, 160, 255}
+		entityColor = LevelEntityColor_Exit
 	case LevelEntity_Player:
-		entityColor = color.RGBA{218, 165, 32, 255}
+		entityColor = LevelEntityColor_Player
+	case LevelEntity_Construct:
+		entityColor = LevelEntityColor_Construct
 	default:
 		entityColor = color.RGBA{200, 200, 200, 255}
 	}
@@ -397,113 +406,4 @@ func main() {
 	if err := ebiten.RunGame(NewGame()); err != nil {
 		log.Fatal(err)
 	}
-}
-
-type LevelEntity int
-
-const (
-	LevelEntity_Empty LevelEntity = iota
-	LevelEntity_Wall
-	LevelEntity_Enemy
-	LevelEntity_Exit
-	LevelEntity_Player
-)
-
-type Level [][]LevelEntity
-
-func NewLevel(file fs.File) Level {
-	defer file.Close()
-
-	img, _, err := image.Decode(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	bounds := img.Bounds()
-	width, height := bounds.Max.X, bounds.Max.Y
-
-	matrix := make(Level, height)
-	for i := range matrix {
-		matrix[i] = make([]LevelEntity, width)
-	}
-
-	// fill matrix based on pixel colors
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-			r, g, b = r>>8, g>>8, b>>8 // convert from uint32 to uint8
-
-			switch {
-			case r == 255 && g == 255 && b == 255: // white (empty space)
-				matrix[y][x] = LevelEntity_Empty
-			case r == 0 && g == 0 && b == 0: // black (wall)
-				matrix[y][x] = LevelEntity_Wall
-			case r == 255 && g == 0 && b == 0: // red (enemy)
-				matrix[y][x] = LevelEntity_Enemy
-			case r == 0 && g == 255 && b == 0: // green (exit)
-				matrix[y][x] = LevelEntity_Exit
-			case r == 0 && g == 0 && b == 255: // blue (player)
-				matrix[y][x] = LevelEntity_Player
-			}
-		}
-	}
-
-	return matrix
-}
-
-func (level Level) GetPlayer() (float64, float64) {
-	playerX := 0
-	playerY := 0
-	for y := 0; y < len(level); y++ {
-		for x := 0; x < len(level[y]); x++ {
-			if level[y][x] == LevelEntity_Player {
-				playerX = x
-			}
-		}
-	}
-
-	for y := 0; y < len(level); y++ {
-		for x := 0; x < len(level[y]); x++ {
-			if level[y][x] == LevelEntity_Player {
-				playerY = y
-			}
-		}
-	}
-
-	// remove player from level
-	level[playerY][playerX] = LevelEntity_Empty
-
-	return float64(playerX), float64(playerY)
-}
-
-func (level Level) GetEnemies() []Enemy {
-	enemies := []Enemy{}
-	for y := 0; y < len(level); y++ {
-		for x := 0; x < len(level[y]); x++ {
-			if level[y][x] == LevelEntity_Enemy {
-				enemies = append(enemies, Enemy{x: float64(x), y: float64(y)})
-			}
-		}
-	}
-	return enemies
-}
-
-func (l Level) Width() int {
-	return len(l[0])
-}
-
-func (l Level) Height() int {
-	return len(l)
-}
-
-func (l Level) Fwidth() float64 {
-	return float64(len(l[0]))
-}
-
-func (l Level) Fheight() float64 {
-	return float64(len(l))
-}
-
-func (l Level) GetEntityAt(x, y int) LevelEntity {
-	return l[y][x]
 }
