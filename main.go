@@ -122,7 +122,7 @@ func (g *Game) Update() error {
 		watchTimer--
 	}
 
-	for i, _ := range g.enemies {
+	for i := range g.enemies {
 		g.enemies[i].watchingPlayer = watchTimer > 0
 	}
 
