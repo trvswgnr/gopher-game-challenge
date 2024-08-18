@@ -183,7 +183,7 @@ func (g *Game) Update() error {
 
 	// Check if player is in enemy's field of vision
 	if g.isPlayerDetectedByEnemy() {
-		g.gameOver = true
+		g.gameOver = false
 	}
 
 	return nil
@@ -425,21 +425,26 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 
 		// Calculate sprite dimensions on screen
 		spriteHeight := int(math.Abs(float64(screenHeight) / transformY))
-		drawStartY := -spriteHeight/2 + screenHeight/2
+		spriteWidth := int(math.Abs(float64(screenHeight) / transformY))
+
+		// Calculate the vertical position
+		vMoveScreen := int(float64(spriteHeight) * (0.5 - g.player.heightOffset))
+		drawStartY := -spriteHeight/2 + screenHeight/2 + vMoveScreen
+		drawEndY := spriteHeight/2 + screenHeight/2 + vMoveScreen
+
+		drawStartX := -spriteWidth/2 + spriteScreenX
+		drawEndX := spriteWidth/2 + spriteScreenX
+
+		// Clamp drawing bounds
 		if drawStartY < 0 {
 			drawStartY = 0
 		}
-		drawEndY := spriteHeight/2 + screenHeight/2
 		if drawEndY >= screenHeight {
 			drawEndY = screenHeight - 1
 		}
-
-		spriteWidth := int(math.Abs(float64(screenHeight) / transformY))
-		drawStartX := -spriteWidth/2 + spriteScreenX
 		if drawStartX < 0 {
 			drawStartX = 0
 		}
-		drawEndX := spriteWidth/2 + spriteScreenX
 		if drawEndX >= screenWidth {
 			drawEndX = screenWidth - 1
 		}
@@ -447,13 +452,13 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 		// Draw the sprite
 		for stripe := drawStartX; stripe < drawEndX; stripe++ {
 			if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
-				texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemy.sprite.Bounds().Dx())) / float64(spriteWidth))
+				texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * 64) / float64(spriteWidth))
 
 				// Create a sub-image for the current stripe
-				subImg := enemy.sprite.SubImage(image.Rect(texX, 0, texX+1, enemy.sprite.Bounds().Dy())).(*ebiten.Image)
+				subImg := enemy.sprite.SubImage(image.Rect(texX, 0, texX+1, 128)).(*ebiten.Image)
 
 				op := &ebiten.DrawImageOptions{}
-				op.GeoM.Scale(float64(spriteWidth)/float64(enemy.sprite.Bounds().Dx()), float64(spriteHeight)/float64(enemy.sprite.Bounds().Dy()))
+				op.GeoM.Scale(float64(spriteWidth)/64, float64(spriteHeight)/128)
 				op.GeoM.Translate(float64(stripe), float64(drawStartY))
 
 				screen.DrawImage(subImg, op)
@@ -775,20 +780,13 @@ func (level Level) GetPlayer() (float64, float64) {
 		for x := 0; x < len(level[y]); x++ {
 			if level[y][x] == LevelEntity_Player {
 				playerX = x
-			}
-		}
-	}
-
-	for y := 0; y < len(level); y++ {
-		for x := 0; x < len(level[y]); x++ {
-			if level[y][x] == LevelEntity_Player {
 				playerY = y
+				// remove player block from level so it doesn't render or collide
+				level[y][x] = LevelEntity_Empty
+				break
 			}
 		}
 	}
-
-	// remove player block from level so it doesn't render or collide
-	level[playerY][playerX] = LevelEntity_Empty
 
 	return float64(playerX), float64(playerY)
 }
@@ -799,6 +797,7 @@ func (level Level) GetEnemies() []Enemy {
 		for x := 0; x < len(level[y]); x++ {
 			if level[y][x] == LevelEntity_Enemy {
 				enemies = append(enemies, Enemy{x: float64(x), y: float64(y)})
+				level[y][x] = LevelEntity_Empty
 			}
 		}
 	}
