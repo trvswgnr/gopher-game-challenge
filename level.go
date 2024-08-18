@@ -103,7 +103,7 @@ func (level Level) GetEnemies() []Enemy {
 	for y := 0; y < len(level); y++ {
 		for x := 0; x < len(level[y]); x++ {
 			if level[y][x] == LevelEntity_Enemy {
-				enemies = append(enemies, Enemy{x: float64(x), y: float64(y)})
+				enemies = append(enemies, Enemy{x: float64(x) + 0.5, y: float64(y) + 0.5, wallX: 0.5})
 			}
 		}
 	}

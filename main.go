@@ -4,6 +4,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"math"
@@ -29,16 +30,18 @@ const (
 )
 
 type Game struct {
-	player   Player
-	enemies  []Enemy
-	minimap  *ebiten.Image
-	level    Level
-	gameOver bool
+	player       Player
+	enemies      []Enemy
+	minimap      *ebiten.Image
+	level        Level
+	gameOver     bool
+	enemyTexture *ebiten.Image
 }
 
 type Enemy struct {
 	x, y           float64
 	watchingPlayer bool
+	wallX          float64
 }
 
 type Player struct {
@@ -74,12 +77,24 @@ func NewGame() *Game {
 	playerX, playerY := level.GetPlayer()
 	player := NewPlayer(playerX, playerY)
 	enemies := level.GetEnemies()
+	enemyTextureFile, err := assets.Open("assets/enemy.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer enemyTextureFile.Close()
+
+	enemyTextureImg, _, err := image.Decode(enemyTextureFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	enemyTexture := ebiten.NewImageFromImage(enemyTextureImg)
 	g := &Game{
-		player:   player,
-		minimap:  ebiten.NewImage(level.Width()*4, level.Height()*4),
-		level:    level,
-		enemies:  enemies,
-		gameOver: false,
+		player:       player,
+		minimap:      ebiten.NewImage(level.Width()*4, level.Height()*4),
+		level:        level,
+		enemies:      enemies,
+		gameOver:     false,
+		enemyTexture: enemyTexture,
 	}
 
 	g.generateStaticMinimap()
@@ -130,7 +145,7 @@ func (g *Game) Update() error {
 
 	// Check if player is in enemy's line of sight
 	if g.isPlayerInEnemySight() {
-		g.gameOver = true
+		g.gameOver = false // TODO: set to true when not debugging
 	}
 
 	return nil
@@ -307,6 +322,7 @@ func (g *Game) castRay(rayDirX, rayDirY float64) []struct {
 	entity LevelEntity
 	dist   float64
 	side   int
+	wallX  float64
 } {
 	mapX, mapY := int(g.player.x), int(g.player.y)
 	var sideDistX, sideDistY float64
@@ -335,6 +351,7 @@ func (g *Game) castRay(rayDirX, rayDirY float64) []struct {
 		entity LevelEntity
 		dist   float64
 		side   int
+		wallX  float64
 	}
 
 	for !hitWall {
@@ -350,16 +367,51 @@ func (g *Game) castRay(rayDirX, rayDirY float64) []struct {
 		hitEntity := g.level.GetEntityAt(mapX, mapY)
 		if hitEntity != LevelEntity_Empty {
 			var dist float64
+			var wallX float64
 			if side == 0 {
 				dist = (float64(mapX) - g.player.x + (1-float64(stepX))/2) / rayDirX
+				wallX = g.player.y + dist*rayDirY
 			} else {
 				dist = (float64(mapY) - g.player.y + (1-float64(stepY))/2) / rayDirY
+				wallX = g.player.x + dist*rayDirX
 			}
+			wallX -= math.Floor(wallX)
+
+			if hitEntity != LevelEntity_Empty {
+				var dist float64
+				var wallX float64
+				if side == 0 {
+					dist = (float64(mapX) - g.player.x + (1-float64(stepX))/2) / rayDirX
+					wallX = g.player.y + dist*rayDirY
+				} else {
+					dist = (float64(mapY) - g.player.y + (1-float64(stepY))/2) / rayDirY
+					wallX = g.player.x + dist*rayDirX
+				}
+				wallX -= math.Floor(wallX)
+
+				if hitEntity == LevelEntity_Enemy {
+					// Find the closest enemy at this position
+					for _, enemy := range g.enemies {
+						if int(enemy.x) == mapX && int(enemy.y) == mapY {
+							// Calculate the relative position of the ray hit on the enemy
+							if side == 0 {
+								wallX = enemy.y + (wallX - math.Floor(enemy.y))
+							} else {
+								wallX = enemy.x + (wallX - math.Floor(enemy.x))
+							}
+							wallX -= math.Floor(wallX)
+							break
+						}
+					}
+				}
+			}
+
 			entities = append(entities, struct {
 				entity LevelEntity
 				dist   float64
 				side   int
-			}{hitEntity, dist, side})
+				wallX  float64
+			}{hitEntity, dist, side, wallX})
 
 			if hitEntity == LevelEntity_Wall {
 				hitWall = true
@@ -374,13 +426,52 @@ func (g *Game) drawEntities(screen *ebiten.Image, x int, entities []struct {
 	entity LevelEntity
 	dist   float64
 	side   int
+	wallX  float64
 }) {
 	for i := len(entities) - 1; i >= 0; i-- {
 		entity := entities[i]
-		_, drawStart, drawEnd := g.calculateLineParameters(entity.dist, entity.entity)
-		wallColor := g.getEntityColor(entity.entity, entity.side)
-		vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
+		lineHeight, drawStart, drawEnd := g.calculateLineParameters(entity.dist, entity.entity)
+
+		if entity.entity == LevelEntity_Enemy && entity.side == 0 {
+			// Apply texture only to one side of the enemy
+			g.drawTexturedEnemy(screen, x, drawStart, drawEnd, lineHeight, entity.dist, entity.wallX)
+		} else {
+			wallColor := g.getEntityColor(entity.entity, entity.side)
+			vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
+		}
 	}
+}
+
+func (g *Game) drawTexturedEnemy(screen *ebiten.Image, x, drawStart, drawEnd, lineHeight int, dist, wallX float64) {
+	texWidth := g.enemyTexture.Bounds().Dx()
+	texHeight := g.enemyTexture.Bounds().Dy()
+
+	// Calculate texture coordinates
+	texX := int(wallX * float64(texWidth))
+
+	// Ensure texX is within bounds
+	texX = texX % texWidth
+
+	// Calculate the step to sample the texture vertically
+
+	// Texture position
+	if drawStart < 0 {
+		drawStart = 0
+	}
+	if drawEnd >= screenHeight {
+		drawEnd = screenHeight - 1
+	}
+
+	// Draw the textured column
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(1, float64(drawEnd-drawStart)/float64(texHeight))
+	op.GeoM.Translate(float64(x), float64(drawStart))
+
+	// Apply distance-based shading
+	shade := 1.0 - math.Min(dist/10, 0.9)
+	op.ColorM.Scale(shade, shade, shade, 1)
+
+	screen.DrawImage(g.enemyTexture.SubImage(image.Rect(texX, 0, texX+1, texHeight)).(*ebiten.Image), op)
 }
 
 func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, int, int) {
@@ -432,7 +523,13 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 	case LevelEntity_Wall:
 		entityColor = color.RGBA{100, 100, 100, 255}
 	case LevelEntity_Enemy:
-		entityColor = color.RGBA{198, 54, 54, 255}
+		if side == 0 {
+			// This side will be textured, so we return a neutral color
+			entityColor = color.RGBA{255, 255, 255, 255}
+		} else {
+			// Non-textured side
+			entityColor = color.RGBA{150, 40, 40, 255}
+		}
 	case LevelEntity_Exit:
 		entityColor = LevelEntityColor_Exit
 	case LevelEntity_Player:
