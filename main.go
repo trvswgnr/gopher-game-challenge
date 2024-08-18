@@ -157,7 +157,7 @@ func (g *Game) Update() error {
 		watchTimer--
 	}
 
-	for i, _ := range g.enemies {
+	for i := range g.enemies {
 		g.enemies[i].watchingPlayer = watchTimer > 0
 	}
 
@@ -428,61 +428,6 @@ func (g *Game) drawEntity(screen *ebiten.Image, x int, entity LevelEntity, dist 
 	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
 }
 
-func (g *Game) drawSprites(screen *ebiten.Image) {
-	// sort enemies by distance from player (furthest first)
-	sort.Slice(g.enemies, func(i, j int) bool {
-		distI := math.Pow(g.enemies[i].x-g.player.x, 2) + math.Pow(g.enemies[i].y-g.player.y, 2)
-		distJ := math.Pow(g.enemies[j].x-g.player.x, 2) + math.Pow(g.enemies[j].y-g.player.y, 2)
-		return distI > distJ
-	})
-
-	for _, enemy := range g.enemies {
-		// translate sprite position to relative to camera
-		spriteX := enemy.x - g.player.x
-		spriteY := enemy.y - g.player.y
-
-		// transform sprite with the inverse camera matrix
-		invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
-		transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
-		transformY := invDet * (-g.player.planeY*spriteX + g.player.planeX*spriteY)
-
-		spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
-
-		// calculate sprite dimensions on screen
-		spriteHeight := int(math.Abs(float64(screenHeight)/transformY) * enemySpriteScale)
-		drawStartY := -spriteHeight/2 + screenHeight/2
-		if drawStartY < 0 {
-			drawStartY = 0
-		}
-		drawEndY := spriteHeight/2 + screenHeight/2
-		if drawEndY >= screenHeight {
-			drawEndY = screenHeight - 1
-		}
-
-		spriteWidth := spriteHeight
-		drawStartX := -spriteWidth/2 + spriteScreenX
-		if drawStartX < 0 {
-			drawStartX = 0
-		}
-		drawEndX := spriteWidth/2 + spriteScreenX
-		if drawEndX >= screenWidth {
-			drawEndX = screenWidth - 1
-		}
-
-		// draw the sprite
-		for stripe := drawStartX; stripe < drawEndX; stripe++ {
-			texX := int(256*(stripe-(-spriteWidth/2+spriteScreenX))*enemy.sprite.Bounds().Dx()/spriteWidth) / 256
-
-			if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
-				op := &ebiten.DrawImageOptions{}
-				op.GeoM.Scale(float64(spriteWidth)/float64(enemy.sprite.Bounds().Dx()), float64(spriteHeight)/float64(enemy.sprite.Bounds().Dy()))
-				op.GeoM.Translate(float64(stripe), float64(drawStartY))
-				screen.DrawImage(enemy.sprite.SubImage(image.Rect(texX, 0, texX+1, enemy.sprite.Bounds().Dy())).(*ebiten.Image), op)
-			}
-		}
-	}
-}
-
 func (g *Game) drawGameOver(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "GAME OVER", screenWidth/2-40, screenHeight/2-10)
 	ebitenutil.DebugPrintAt(screen, "Press SPACE to restart", screenWidth/2-80, screenHeight/2+10)
@@ -497,21 +442,6 @@ func (g *Game) drawFloorAndCeiling(screen *ebiten.Image) {
 			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
 		} else {
 			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
-		}
-	}
-}
-
-func (g *Game) drawBlocks(screen *ebiten.Image) {
-	for x := 0; x < screenWidth; x++ {
-		rayDirX, rayDirY := g.calculateRayDirection(x)
-		entities := g.castRay(rayDirX, rayDirY)
-		g.drawEntities(screen, x, entities)
-
-		// update zbuffer with the distance to the wall
-		if len(entities) > 0 {
-			g.zBuffer[x] = entities[0].dist
-		} else {
-			g.zBuffer[x] = math.Inf(1)
 		}
 	}
 }
@@ -588,22 +518,6 @@ func (g *Game) castRay(rayDirX, rayDirY float64) []struct {
 	}
 
 	return entities
-}
-
-func (g *Game) drawEntities(screen *ebiten.Image, x int, entities []struct {
-	entity LevelEntity
-	dist   float64
-	side   int
-}) {
-	for i := len(entities) - 1; i >= 0; i-- {
-		entity := entities[i]
-		if entity.entity == LevelEntity_Enemy {
-			continue
-		}
-		_, drawStart, drawEnd := g.calculateLineParameters(entity.dist, entity.entity)
-		wallColor := g.getEntityColor(entity.entity, entity.side)
-		vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
-	}
 }
 
 func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, int, int) {
