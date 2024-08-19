@@ -297,7 +297,7 @@ func (g *Game) handleInput() {
 		g.strafePlayer(strafeSpeed)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyC) {
+	if ebiten.IsKeyPressed(ebiten.KeyShift) {
 		g.player.speed = playerSpeedCrouching
 		g.adjustPlayerHeightOffset(playerCrouchingTransitionSpeed)
 	} else {
