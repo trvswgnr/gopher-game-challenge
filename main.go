@@ -221,6 +221,12 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 		y := y1 + t*dy
 
 		tileX, tileY := int(x), int(y)
+
+		// Add boundary checks
+		if tileX < 0 || tileX >= g.level.width() || tileY < 0 || tileY >= g.level.height() {
+			return false
+		}
+
 		if g.level.getEntityAt(tileX, tileY) == LevelEntity_Wall {
 			return false
 		}
