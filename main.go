@@ -21,24 +21,25 @@ import (
 var assets embed.FS
 
 const (
-	screenWidth                 int     = 1024
-	screenHeight                int     = 768
-	playerSpeedStanding         float64 = 0.08
-	playerSpeedCrouching        float64 = 0.01
-	playerRotateSpeed           float64 = 0.07
-	playerStandingHeightOffset  float64 = 0.2
-	playerCrouchingHeightOffset float64 = 0.6
-	playerCrouchingSpeed        float64 = 0.03
+	screenWidth                    int     = 1024
+	screenHeight                   int     = 768
+	playerSpeedStanding            float64 = 0.08
+	playerSpeedCrouching           float64 = 0.01
+	playerRotateSpeed              float64 = 0.07
+	playerStandingHeightOffset     float64 = 0.2
+	playerCrouchingHeightOffset    float64 = 0.6
+	playerCrouchingTransitionSpeed float64 = 0.03
 )
 
 type Game struct {
-	player      Player
-	enemies     []Enemy
-	minimap     *ebiten.Image
-	level       Level
-	gameOver    bool
-	enemySprite *ebiten.Image
-	zBuffer     []float64
+	player       Player
+	enemies      []Enemy
+	minimap      *ebiten.Image
+	level        Level
+	gameOver     bool
+	enemySprites map[string]*ebiten.Image
+
+	zBuffer []float64
 }
 
 type Direction int
@@ -51,15 +52,13 @@ const (
 )
 
 type Enemy struct {
-	x, y           float64
-	dirX, dirY     float64
-	sprite         *ebiten.Image
-	patrolPoints   []PatrolPoint
-	currentPoint   int
-	speed          float64
-	fovAngle       float64
-	fovDistance    float64
-	detectionTimer int
+	x, y         float64
+	dirX, dirY   float64
+	patrolPoints []PatrolPoint
+	currentPoint int
+	speed        float64
+	fovAngle     float64
+	fovDistance  float64
 }
 
 type PatrolPoint struct {
@@ -98,35 +97,40 @@ func NewGame() *Game {
 	level := NewLevel(file)
 	playerX, playerY := level.GetPlayer()
 	player := NewPlayer(playerX, playerY)
-	enemySprite, _, err := ebitenutil.NewImageFromFile("assets/enemy.png")
-	if err != nil {
-		log.Fatal(err)
+
+	enemySprites := make(map[string]*ebiten.Image)
+	spriteNames := []string{"front", "front-left", "front-right", "back", "back-left", "back-right"}
+
+	for _, name := range spriteNames {
+		sprite, _, err := ebitenutil.NewImageFromFile(fmt.Sprintf("assets/enemy-%s.png", name))
+		if err != nil {
+			log.Fatalf("failed to load enemy sprite %s: %v", name, err)
+		}
+		enemySprites[name] = sprite
 	}
 
 	g := &Game{
-		player:      player,
-		minimap:     ebiten.NewImage(level.Width()*4, level.Height()*4),
-		level:       level,
-		enemies:     make([]Enemy, 0),
-		gameOver:    false,
-		enemySprite: enemySprite,
-		zBuffer:     make([]float64, screenWidth),
+		player:       player,
+		minimap:      ebiten.NewImage(level.Width()*4, level.Height()*4),
+		level:        level,
+		enemies:      make([]Enemy, 0),
+		gameOver:     false,
+		enemySprites: enemySprites,
+		zBuffer:      make([]float64, screenWidth),
 	}
 
 	// Initialize enemies with patrol points
 	for _, enemyPos := range level.GetEnemies() {
 		enemy := Enemy{
-			x:              enemyPos.x,
-			y:              enemyPos.y,
-			dirX:           1,
-			dirY:           0,
-			sprite:         enemySprite,
-			patrolPoints:   generatePatrolPoints(level, enemyPos.x, enemyPos.y),
-			currentPoint:   0,
-			speed:          0.03,
-			fovAngle:       math.Pi / 3, // 60 degrees
-			fovDistance:    5,
-			detectionTimer: 0,
+			x:            enemyPos.x,
+			y:            enemyPos.y,
+			dirX:         1,
+			dirY:         0,
+			patrolPoints: generatePatrolPoints(level, enemyPos.x, enemyPos.y),
+			currentPoint: 0,
+			speed:        0.03,
+			fovAngle:     math.Pi / 3, // 60 degrees
+			fovDistance:  5,
 		}
 		g.enemies = append(g.enemies, enemy)
 	}
@@ -211,7 +215,6 @@ func (g *Game) isPlayerDetectedByEnemy() bool {
 			if angleDiff <= enemy.fovAngle/2 {
 				// Player is within FOV, perform raycast to check for obstacles
 				if g.hasLineOfSight(enemy.x, enemy.y, g.player.x, g.player.y) {
-					enemy.detectionTimer = 100 // Set detection timer (adjust as needed)
 					return true
 				}
 			}
@@ -292,10 +295,6 @@ func (g *Game) updateEnemy(e *Enemy) {
 	// Update direction
 	e.dirX, e.dirY = dx/dist, dy/dist
 
-	// Update detection timer
-	if e.detectionTimer > 0 {
-		e.detectionTimer--
-	}
 }
 
 func (g *Game) handleInput() {
@@ -315,13 +314,12 @@ func (g *Game) handleInput() {
 		g.rotatePlayer(playerRotateSpeed)
 	}
 
-	g.player.isCrouching = ebiten.IsKeyPressed(ebiten.KeyC)
-	if g.player.isCrouching {
+	if ebiten.IsKeyPressed(ebiten.KeyC) {
 		g.player.speed = playerSpeedCrouching
-		g.adjustPlayerHeightOffset(playerCrouchingSpeed)
+		g.adjustPlayerHeightOffset(playerCrouchingTransitionSpeed)
 	} else {
 		g.player.speed = playerSpeedStanding
-		g.adjustPlayerHeightOffset(-playerCrouchingSpeed)
+		g.adjustPlayerHeightOffset(-playerCrouchingTransitionSpeed)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
@@ -449,16 +447,47 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 			drawEndX = screenWidth - 1
 		}
 
+		// Calculate the angle between enemy direction and player-to-enemy vector
+		enemyToPlayerX := g.player.x - enemy.x
+		enemyToPlayerY := g.player.y - enemy.y
+		angle := math.Atan2(enemyToPlayerY, enemyToPlayerX) - math.Atan2(enemy.dirY, enemy.dirX)
+
+		// Normalize angle to be between -π and π
+		for angle < -math.Pi {
+			angle += 2 * math.Pi
+		}
+		for angle > math.Pi {
+			angle -= 2 * math.Pi
+		}
+
+		// Choose the appropriate sprite based on the angle
+		var spriteName string
+		if math.Abs(angle) < math.Pi/6 {
+			spriteName = "front"
+		} else if angle >= math.Pi/6 && angle < math.Pi/2 {
+			spriteName = "front-left"
+		} else if angle >= math.Pi/2 && angle < 5*math.Pi/6 {
+			spriteName = "back-left"
+		} else if angle >= 5*math.Pi/6 || angle < -5*math.Pi/6 {
+			spriteName = "back"
+		} else if angle >= -5*math.Pi/6 && angle < -math.Pi/2 {
+			spriteName = "back-right"
+		} else {
+			spriteName = "front-right"
+		}
+
+		enemySprite := g.enemySprites[spriteName]
+
 		// Draw the sprite
 		for stripe := drawStartX; stripe < drawEndX; stripe++ {
 			if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
-				texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * 64) / float64(spriteWidth))
+				texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(spriteWidth))
 
 				// Create a sub-image for the current stripe
-				subImg := enemy.sprite.SubImage(image.Rect(texX, 0, texX+1, 128)).(*ebiten.Image)
+				subImg := enemySprite.SubImage(image.Rect(texX, 0, texX+1, enemySprite.Bounds().Dy())).(*ebiten.Image)
 
 				op := &ebiten.DrawImageOptions{}
-				op.GeoM.Scale(float64(spriteWidth)/64, float64(spriteHeight)/128)
+				op.GeoM.Scale(float64(spriteWidth)/float64(enemySprite.Bounds().Dx()), float64(spriteHeight)/float64(enemySprite.Bounds().Dy()))
 				op.GeoM.Translate(float64(stripe), float64(drawStartY))
 
 				screen.DrawImage(subImg, op)
@@ -604,6 +633,7 @@ func (g *Game) adjustPlayerHeightOffset(delta float64) {
 	} else if g.player.heightOffset < playerStandingHeightOffset {
 		g.player.heightOffset = playerStandingHeightOffset
 	}
+	g.player.isCrouching = g.player.heightOffset == playerCrouchingHeightOffset
 }
 
 func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
