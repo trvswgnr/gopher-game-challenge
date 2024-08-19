@@ -686,7 +686,7 @@ func (g *Game) Update() error {
 
 	// check if player is in enemy's field of vision
 	if g.isPlayerDetectedByEnemy() {
-		g.gameOver = false
+		g.gameOver = false // TODO: set to true when not debugging
 	}
 
 	return nil
