@@ -119,7 +119,7 @@ func NewGame() *Game {
 		zBuffer:      make([]float64, screenWidth),
 	}
 
-	// Initialize enemies with patrol points
+	// initialize enemies with patrol points
 	for _, enemyPos := range level.GetEnemies() {
 		enemy := Enemy{
 			x:            enemyPos.x,
@@ -150,7 +150,7 @@ func NewGame() *Game {
 }
 
 func generatePatrolPoints(level Level, startX, startY float64) []PatrolPoint {
-	// This is a simple implementation. You may want to create more complex patrol patterns.
+	// this is a simple implementation. you may want to create more complex patrol patterns.
 	points := []PatrolPoint{
 		{startX, startY},
 		{startX + 2, startY},
@@ -158,7 +158,7 @@ func generatePatrolPoints(level Level, startX, startY float64) []PatrolPoint {
 		{startX, startY + 2},
 	}
 
-	// Validate points (ensure they're not walls)
+	// validate points (ensure they're not walls)
 	validPoints := make([]PatrolPoint, 0)
 	for _, p := range points {
 		if level.GetEntityAt(int(p.x), int(p.y)) != LevelEntity_Wall {
@@ -180,12 +180,12 @@ func (g *Game) Update() error {
 
 	g.handleInput()
 
-	// Update enemies
+	// update enemies
 	for i := range g.enemies {
 		g.updateEnemy(&g.enemies[i])
 	}
 
-	// Check if player is in enemy's field of vision
+	// check if player is in enemy's field of vision
 	if g.isPlayerDetectedByEnemy() {
 		g.gameOver = false
 	}
@@ -197,7 +197,7 @@ func (g *Game) isPlayerDetectedByEnemy() bool {
 	for i := range g.enemies {
 		enemy := &g.enemies[i]
 
-		// Calculate angle between enemy and player
+		// calculate angle between enemy and player
 		dx := g.player.x - enemy.x
 		dy := g.player.y - enemy.y
 		distToPlayer := math.Sqrt(dx*dx + dy*dy)
@@ -207,13 +207,13 @@ func (g *Game) isPlayerDetectedByEnemy() bool {
 			enemyAngle := math.Atan2(enemy.dirY, enemy.dirX)
 			angleDiff := math.Abs(angleToPlayer - enemyAngle)
 
-			// Normalize angle difference
+			// normalize angle difference
 			if angleDiff > math.Pi {
 				angleDiff = 2*math.Pi - angleDiff
 			}
 
 			if angleDiff <= enemy.fovAngle/2 {
-				// Player is within FOV, perform raycast to check for obstacles
+				// player is within fov, perform raycast to check for obstacles
 				if g.hasLineOfSight(enemy.x, enemy.y, g.player.x, g.player.y) {
 					return true
 				}
@@ -278,21 +278,21 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 }
 
 func (g *Game) updateEnemy(e *Enemy) {
-	// Move towards the current patrol point
+	// move towards the current patrol point
 	targetX, targetY := e.patrolPoints[e.currentPoint].x, e.patrolPoints[e.currentPoint].y
 	dx, dy := targetX-e.x, targetY-e.y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
 	if dist < e.speed {
-		// Reached the current patrol point, move to the next one
+		// reached the current patrol point, move to the next one
 		e.currentPoint = (e.currentPoint + 1) % len(e.patrolPoints)
 	} else {
-		// Move towards the current patrol point
+		// move towards the current patrol point
 		e.x += (dx / dist) * e.speed
 		e.y += (dy / dist) * e.speed
 	}
 
-	// Update direction
+	// update direction
 	e.dirX, e.dirY = dx/dist, dy/dist
 
 }
@@ -389,7 +389,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// Draw blocks and enemies
+	// draw blocks and enemies
 	for x := 0; x < screenWidth; x++ {
 		rayDirX, rayDirY := g.calculateRayDirection(x)
 		entities := g.castRay(x, rayDirX, rayDirY)
@@ -402,7 +402,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) drawEnemies(screen *ebiten.Image) {
-	// Sort enemies by distance from player (furthest first)
+	// sort enemies by distance from player (furthest first)
 	sort.Slice(g.enemies, func(i, j int) bool {
 		distI := math.Pow(g.enemies[i].x-g.player.x, 2) + math.Pow(g.enemies[i].y-g.player.y, 2)
 		distJ := math.Pow(g.enemies[j].x-g.player.x, 2) + math.Pow(g.enemies[j].y-g.player.y, 2)
@@ -410,22 +410,22 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 	})
 
 	for _, enemy := range g.enemies {
-		// Calculate enemy position relative to player
+		// calculate enemy position relative to player
 		spriteX := enemy.x - g.player.x
 		spriteY := enemy.y - g.player.y
 
-		// Transform sprite with the inverse camera matrix
+		// transform sprite with the inverse camera matrix
 		invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
 		transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
 		transformY := invDet * (-g.player.planeY*spriteX + g.player.planeX*spriteY)
 
 		spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
 
-		// Calculate sprite dimensions on screen
+		// calculate sprite dimensions on screen
 		spriteHeight := int(math.Abs(float64(screenHeight) / transformY))
 		spriteWidth := int(math.Abs(float64(screenHeight) / transformY))
 
-		// Calculate the vertical position
+		// calculate the vertical position
 		vMoveScreen := int(float64(spriteHeight) * (0.5 - g.player.heightOffset))
 		drawStartY := -spriteHeight/2 + screenHeight/2 + vMoveScreen
 		drawEndY := spriteHeight/2 + screenHeight/2 + vMoveScreen
@@ -433,7 +433,7 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 		drawStartX := -spriteWidth/2 + spriteScreenX
 		drawEndX := spriteWidth/2 + spriteScreenX
 
-		// Clamp drawing bounds
+		// clamp drawing bounds
 		if drawStartY < 0 {
 			drawStartY = 0
 		}
@@ -447,12 +447,12 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 			drawEndX = screenWidth - 1
 		}
 
-		// Calculate the angle between enemy direction and player-to-enemy vector
+		// calculate the angle between enemy direction and player-to-enemy vector
 		enemyToPlayerX := g.player.x - enemy.x
 		enemyToPlayerY := g.player.y - enemy.y
 		angle := math.Atan2(enemyToPlayerY, enemyToPlayerX) - math.Atan2(enemy.dirY, enemy.dirX)
 
-		// Normalize angle to be between -π and π
+		// normalize angle to be between -π and π
 		for angle < -math.Pi {
 			angle += 2 * math.Pi
 		}
@@ -460,7 +460,7 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 			angle -= 2 * math.Pi
 		}
 
-		// Choose the appropriate sprite based on the angle
+		// choose the appropriate sprite based on the angle
 		var spriteName string
 		if math.Abs(angle) < math.Pi/6 {
 			spriteName = "front"
@@ -478,12 +478,12 @@ func (g *Game) drawEnemies(screen *ebiten.Image) {
 
 		enemySprite := g.enemySprites[spriteName]
 
-		// Draw the sprite
+		// draw the sprite
 		for stripe := drawStartX; stripe < drawEndX; stripe++ {
 			if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
 				texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(spriteWidth))
 
-				// Create a sub-image for the current stripe
+				// create a sub-image for the current stripe
 				subImg := enemySprite.SubImage(image.Rect(texX, 0, texX+1, enemySprite.Bounds().Dy())).(*ebiten.Image)
 
 				op := &ebiten.DrawImageOptions{}
@@ -561,7 +561,7 @@ func (g *Game) castRay(x int, rayDirX, rayDirY float64) []struct {
 				dist = (float64(mapY) - g.player.y + (1-float64(stepY))/2) / rayDirY
 			}
 
-			// Update zBuffer
+			// update zbuffer
 			g.zBuffer[x] = dist
 
 			entities = append(entities, struct {
@@ -694,10 +694,10 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 		enemyX := float32(screenWidth - g.level.Width()*4 - 10 + int(enemy.x*4))
 		enemyY := float32(10 + int(enemy.y*4))
 
-		// Draw enemy
+		// draw enemy
 		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{0, 255, 0, 255}, false)
 
-		// Draw field of vision
+		// draw field of vision
 		leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
 		rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
 
