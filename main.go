@@ -25,21 +25,21 @@ const (
 	screenHeight                   int     = 768
 	playerSpeedStanding            float64 = 0.08
 	playerSpeedCrouching           float64 = 0.01
-	playerRotateSpeed              float64 = 0.07
 	playerStandingHeightOffset     float64 = 0.2
 	playerCrouchingHeightOffset    float64 = 0.6
 	playerCrouchingTransitionSpeed float64 = 0.03
+	mouseSensitivity               float64 = 0.002
 )
 
 type Game struct {
-	player       Player
-	enemies      []Enemy
-	minimap      *ebiten.Image
-	level        Level
-	gameOver     bool
-	enemySprites map[string]*ebiten.Image
-
-	zBuffer []float64
+	player                 Player
+	enemies                []Enemy
+	minimap                *ebiten.Image
+	level                  Level
+	gameOver               bool
+	enemySprites           map[string]*ebiten.Image
+	zBuffer                []float64
+	prevMouseX, prevMouseY int
 }
 
 type Direction int
@@ -72,20 +72,23 @@ type Player struct {
 	heightOffset   float64
 	isCrouching    bool
 	speed          float64
+	verticalAngle  float64
 }
 
 func NewPlayer(x, y float64) Player {
-	offsetX, offsetY := 0.5, 0.5 // offset to center the player in the tile
+	offset := 0.5 // offset to center player in tile
+
 	return Player{
-		x:            x + offsetX,
-		y:            y + offsetY,
-		dirX:         -1,
-		dirY:         0,
-		planeX:       0,
-		planeY:       0.66,
-		heightOffset: playerStandingHeightOffset,
-		isCrouching:  false,
-		speed:        playerSpeedStanding,
+		x:             x + offset,
+		y:             y + offset,
+		dirX:          -1,
+		dirY:          0,
+		planeX:        0,
+		planeY:        0.66,
+		heightOffset:  playerStandingHeightOffset,
+		isCrouching:   false,
+		speed:         playerSpeedStanding,
+		verticalAngle: 0,
 	}
 }
 
@@ -94,7 +97,9 @@ func NewGame() *Game {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	level := NewLevel(file)
+
 	playerX, playerY := level.getPlayer()
 	player := NewPlayer(playerX, playerY)
 
@@ -117,6 +122,8 @@ func NewGame() *Game {
 		gameOver:     false,
 		enemySprites: enemySprites,
 		zBuffer:      make([]float64, screenWidth),
+		prevMouseX:   0,
+		prevMouseY:   0,
 	}
 
 	// initialize enemies with patrol points
@@ -195,12 +202,27 @@ func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
 	if distToPlayer <= enemy.fovDistance && angleDiff <= enemy.fovAngle/2 {
 		// check if there's a clear line of sight
 		if g.hasLineOfSight(enemy.x, enemy.y, g.player.x, g.player.y) {
-			// check if player is crouching behind a construct
+			// if the player is crouching, check if they're hidden behind a construct
 			if g.player.isCrouching {
 				playerTileX, playerTileY := int(g.player.x), int(g.player.y)
-				constructInFront := g.isConstructBetween(enemy.x, enemy.y, float64(playerTileX), float64(playerTileY))
-				if constructInFront {
-					return false
+
+				// check tiles between enemy and player for constructs
+				steps := int(distToPlayer * 2)
+				for i := 0; i <= steps; i++ {
+					t := float64(i) / float64(steps)
+					checkX := enemy.x + t*dx
+					checkY := enemy.y + t*dy
+					checkTileX, checkTileY := int(checkX), int(checkY)
+
+					// if we've reached the player's tile, stop checking
+					if checkTileX == playerTileX && checkTileY == playerTileY {
+						break
+					}
+
+					// if we find a construct, the player is hidden
+					if g.level.getEntityAt(checkTileX, checkTileY) == LevelEntity_Construct {
+						return false
+					}
 				}
 			}
 			return true
@@ -213,7 +235,7 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 	dx := x2 - x1
 	dy := y2 - y1
 	distance := math.Sqrt(dx*dx + dy*dy)
-	steps := int(distance * 2) // change this to increase precision
+	steps := int(distance * 2) // adjust for precision
 
 	for i := 0; i <= steps; i++ {
 		t := float64(i) / float64(steps)
@@ -222,7 +244,7 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 
 		tileX, tileY := int(x), int(y)
 
-		// Add boundary checks
+		// add boundary checks
 		if tileX < 0 || tileX >= g.level.width() || tileY < 0 || tileY >= g.level.height() {
 			return false
 		}
@@ -232,25 +254,6 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 		}
 	}
 	return true
-}
-
-func (g *Game) isConstructBetween(x1, y1, x2, y2 float64) bool {
-	dx := x2 - x1
-	dy := y2 - y1
-	distance := math.Sqrt(dx*dx + dy*dy)
-	steps := int(distance * 2) // change this to increase precision
-
-	for i := 0; i <= steps; i++ {
-		t := float64(i) / float64(steps)
-		x := x1 + t*dx
-		y := y1 + t*dy
-
-		tileX, tileY := int(x), int(y)
-		if g.level.getEntityAt(tileX, tileY) == LevelEntity_Construct {
-			return true
-		}
-	}
-	return false
 }
 
 func (g *Game) updateEnemy(e *Enemy) {
@@ -270,7 +273,6 @@ func (g *Game) updateEnemy(e *Enemy) {
 
 	// update direction
 	e.dirX, e.dirY = dx/dist, dy/dist
-
 }
 
 func (g *Game) handleInput() {
@@ -278,16 +280,21 @@ func (g *Game) handleInput() {
 		return
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.movePlayer(g.player.speed)
-	} else if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.movePlayer(-g.player.speed)
-	}
+	moveSpeed := g.player.speed
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.rotatePlayer(-playerRotateSpeed)
-	} else if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.rotatePlayer(playerRotateSpeed)
+	strafeSpeed := g.player.speed * 0.75 // slightly slower strafing
+
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		g.movePlayer(moveSpeed, 0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		g.movePlayer(-moveSpeed, 0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		g.strafePlayer(-strafeSpeed)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		g.strafePlayer(strafeSpeed)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyC) {
@@ -298,16 +305,17 @@ func (g *Game) handleInput() {
 		g.adjustPlayerHeightOffset(-playerCrouchingTransitionSpeed)
 	}
 
+	g.handleMouseLook()
+
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		os.Exit(0)
 	}
 }
 
-func (g *Game) movePlayer(speed float64) {
-	nextX := g.player.x + g.player.dirX*speed
-	nextY := g.player.y + g.player.dirY*speed
+func (g *Game) movePlayer(forwardSpeed, strafeSpeed float64) {
+	nextX := g.player.x + g.player.dirX*forwardSpeed + g.player.planeX*strafeSpeed
+	nextY := g.player.y + g.player.dirY*forwardSpeed + g.player.planeY*strafeSpeed
 
-	// check collision with walls and enemies
 	if !g.playerCollision(nextX, g.player.y) {
 		g.player.x = nextX
 	}
@@ -316,18 +324,49 @@ func (g *Game) movePlayer(speed float64) {
 	}
 }
 
+func (g *Game) strafePlayer(speed float64) {
+	g.movePlayer(0, speed)
+}
+
+func (g *Game) handleMouseLook() {
+	cx, cy := ebiten.CursorPosition()
+
+	if g.prevMouseX == 0 && g.prevMouseY == 0 {
+		g.prevMouseX, g.prevMouseY = cx, cy
+		return
+	}
+
+	sensitivityX := mouseSensitivity
+	sensitivityY := mouseSensitivity
+
+	dx := float64(cx - g.prevMouseX)
+	dy := float64(cy - g.prevMouseY)
+
+	g.rotatePlayer(-dx * sensitivityX)
+
+	// handle vertical look
+	g.player.verticalAngle -= dy * sensitivityY
+
+	// clamp vertical angle to prevent looking too far up or down
+	maxVerticalAngle := math.Pi / 3 // 60 degrees
+	g.player.verticalAngle = math.Max(-maxVerticalAngle, math.Min(maxVerticalAngle, g.player.verticalAngle))
+
+	g.prevMouseX, g.prevMouseY = cx, cy
+}
+
 func (g *Game) playerCollision(x, y float64) bool {
-	// check if the position is within the level bounds
+	// check position is within level bounds
 	if x < 0 || y < 0 || int(x) >= g.level.width() || int(y) >= g.level.height() {
 		return true
 	}
 
-	// check if the position is a wall or a construct
+	// check position is wall or construct
 	entity := g.level.getEntityAt(int(x), int(y))
 	if entity == LevelEntity_Wall || entity == LevelEntity_Construct {
 		return true
 	}
 
+	// check enemy collision
 	for _, enemy := range g.enemies {
 		dx := x - enemy.x
 		dy := y - enemy.y
@@ -435,8 +474,9 @@ func (g *Game) castRay(x int, rayDirX, rayDirY float64) []struct {
 func (g *Game) calculateLineParameters(dist float64, entity LevelEntity) (int, int, int) {
 	lineHeight := int(float64(screenHeight) / dist)
 
-	// adjust the vertical position based on player height
-	heightOffset := int((0.5 - g.player.heightOffset) * float64(screenHeight) / dist)
+	// adjust the vertical position based on player height and vertical angle
+	verticalOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
+	heightOffset := int((0.5-g.player.heightOffset)*float64(screenHeight)/dist) + verticalOffset
 
 	drawStart := -lineHeight/2 + screenHeight/2 + heightOffset
 	drawEnd := lineHeight/2 + screenHeight/2 + heightOffset
@@ -607,26 +647,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.zBuffer[i] = math.Inf(1)
 	}
 
-	// draw the floor and ceiling
+	// draw floor and ceiling
 	floorColor := color.RGBA{30, 30, 30, 255}
 	ceilingColor := color.RGBA{160, 227, 254, 255}
+	horizon := screenHeight/2 + int(float64(screenHeight)*math.Tan(g.player.verticalAngle))
 	for y := 0; y < screenHeight; y++ {
-		if y < screenHeight/2 {
+		if y < horizon {
 			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
 		} else {
 			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
 		}
 	}
 
-	// collect all drawable entities
-	var drawables []drawable
+	var drawables []Drawable // all drawable entities
 
 	// collect walls and constructs
 	for x := 0; x < screenWidth; x++ {
 		rayDirX, rayDirY := g.calculateRayDirection(x)
 		entities := g.castRay(x, rayDirX, rayDirY)
 		for _, entity := range entities {
-			drawables = append(drawables, drawable{
+			drawables = append(drawables, Drawable{
 				entityType: entityTypeWallOrConstruct,
 				x:          x,
 				dist:       entity.dist,
@@ -646,7 +686,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
 
-		drawables = append(drawables, drawable{
+		drawables = append(drawables, Drawable{
 			entityType: entityTypeEnemy,
 			x:          spriteScreenX,
 			dist:       transformY,
@@ -673,15 +713,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawUI(screen)
 }
 
-type entityType int
+type EntityType int
 
 const (
-	entityTypeWallOrConstruct entityType = iota
+	entityTypeWallOrConstruct EntityType = iota
 	entityTypeEnemy
 )
 
-type drawable struct {
-	entityType entityType
+type Drawable struct {
+	entityType EntityType
 	x          int
 	dist       float64
 	entity     LevelEntity
@@ -709,24 +749,17 @@ func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
 	spriteWidth := int(math.Abs(float64(screenHeight) / transformY))
 
 	vMoveScreen := int(float64(spriteHeight) * (0.5 - g.player.heightOffset))
+
 	drawStartY := -spriteHeight/2 + screenHeight/2 + vMoveScreen
 	drawEndY := spriteHeight/2 + screenHeight/2 + vMoveScreen
 
 	drawStartX := -spriteWidth/2 + spriteScreenX
 	drawEndX := spriteWidth/2 + spriteScreenX
 
-	if drawStartY < 0 {
-		drawStartY = 0
-	}
-	if drawEndY >= screenHeight {
-		drawEndY = screenHeight - 1
-	}
-	if drawStartX < 0 {
-		drawStartX = 0
-	}
-	if drawEndX >= screenWidth {
-		drawEndX = screenWidth - 1
-	}
+	verticalAngleOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
+
+	drawStartY += verticalAngleOffset
+	drawEndY += verticalAngleOffset
 
 	enemyToPlayerX := g.player.x - enemy.x
 	enemyToPlayerY := g.player.y - enemy.y
@@ -753,17 +786,37 @@ func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
 	} else {
 		spriteName = "front-right"
 	}
-
 	enemySprite := g.enemySprites[spriteName]
+
+	visibleStartY := 0
+	visibleEndY := enemySprite.Bounds().Dy()
+
+	if drawStartY < 0 {
+		visibleStartY = -drawStartY * enemySprite.Bounds().Dy() / spriteHeight
+		drawStartY = 0
+	}
+	if drawEndY >= screenHeight {
+		visibleEndY = (screenHeight - drawStartY) * enemySprite.Bounds().Dy() / spriteHeight
+		drawEndY = screenHeight - 1
+	}
+
+	// clamp horizontal drawing boundaries
+	if drawStartX < 0 {
+		drawStartX = 0
+	}
+	if drawEndX >= screenWidth {
+		drawEndX = screenWidth - 1
+	}
 
 	for stripe := drawStartX; stripe < drawEndX; stripe++ {
 		if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
 			texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(spriteWidth))
 
-			subImg := enemySprite.SubImage(image.Rect(texX, 0, texX+1, enemySprite.Bounds().Dy())).(*ebiten.Image)
+			subImg := enemySprite.SubImage(image.Rect(texX, visibleStartY, texX+1, visibleEndY)).(*ebiten.Image)
 
 			op := &ebiten.DrawImageOptions{}
-			op.GeoM.Scale(float64(spriteWidth)/float64(enemySprite.Bounds().Dx()), float64(spriteHeight)/float64(enemySprite.Bounds().Dy()))
+			scaleY := float64(drawEndY-drawStartY) / float64(visibleEndY-visibleStartY)
+			op.GeoM.Scale(1, scaleY)
 			op.GeoM.Translate(float64(stripe), float64(drawStartY))
 
 			screen.DrawImage(subImg, op)
@@ -778,6 +831,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("maze 3d raycasting")
+	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	if err := ebiten.RunGame(NewGame()); err != nil {
 		log.Fatal(err)
@@ -873,6 +927,7 @@ func (level Level) getEnemies() []Enemy {
 		for x := 0; x < len(level[y]); x++ {
 			if level[y][x] == LevelEntity_Enemy {
 				enemies = append(enemies, Enemy{x: float64(x), y: float64(y)})
+				// remove enemy block from level so it doesn't render or collide
 				level[y][x] = LevelEntity_Empty
 			}
 		}
