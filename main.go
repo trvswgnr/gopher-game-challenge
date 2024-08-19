@@ -372,6 +372,7 @@ func (g *Game) playerCollision(x, y float64) bool {
 		dy := y - enemy.y
 		distSquared := dx*dx + dy*dy
 		if distSquared < 0.25 { // collision radius of 0.5
+			g.gameOver = true // running into an enemy probably alerts them lol
 			return true
 		}
 	}
