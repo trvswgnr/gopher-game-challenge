@@ -12,9 +12,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/vector"
+	"game/engine"
 )
 
 //go:embed assets/*
@@ -34,10 +32,10 @@ const (
 type Game struct {
 	player                 Player
 	enemies                []Enemy
-	minimap                *ebiten.Image
+	minimap                *engine.Image
 	level                  Level
 	gameOver               bool
-	enemySprites           map[string]*ebiten.Image
+	enemySprites           map[string]*engine.Image
 	zBuffer                []float64
 	prevMouseX, prevMouseY int
 }
@@ -103,11 +101,11 @@ func NewGame() *Game {
 	playerX, playerY := level.getPlayer()
 	player := NewPlayer(playerX, playerY)
 
-	enemySprites := make(map[string]*ebiten.Image)
+	enemySprites := make(map[string]*engine.Image)
 	spriteNames := []string{"front", "front-left", "front-right", "back", "back-left", "back-right"}
 
 	for _, name := range spriteNames {
-		sprite, _, err := ebitenutil.NewImageFromFile(fmt.Sprintf("assets/enemy-%s.png", name))
+		sprite, err := engine.NewImageFromFile(fmt.Sprintf("assets/enemy-%s.png", name))
 		if err != nil {
 			log.Fatalf("failed to load enemy sprite %s: %v", name, err)
 		}
@@ -116,7 +114,7 @@ func NewGame() *Game {
 
 	g := &Game{
 		player:       player,
-		minimap:      ebiten.NewImage(level.width()*4, level.height()*4),
+		minimap:      engine.NewImage(level.width()*4, level.height()*4),
 		level:        level,
 		enemies:      make([]Enemy, 0),
 		gameOver:     false,
@@ -142,16 +140,16 @@ func NewGame() *Game {
 		g.enemies = append(g.enemies, enemy)
 	}
 
-	// generate static minimap
-	for y := 0; y < g.level.height(); y++ {
-		for x := 0; x < g.level.width(); x++ {
-			if g.level.getEntityAt(x, y) == LevelEntity_Wall {
-				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{50, 50, 50, 255}, false)
-			} else {
-				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
-			}
-		}
-	}
+	// // generate static minimap
+	// for y := 0; y < g.level.height(); y++ {
+	// 	for x := 0; x < g.level.width(); x++ {
+	// 		if g.level.getEntityAt(x, y) == LevelEntity_Wall {
+	// 			vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{50, 50, 50, 255}, false)
+	// 		} else {
+	// 			vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
+	// 		}
+	// 	}
+	// }
 
 	return g
 }
@@ -284,20 +282,20 @@ func (g *Game) handleInput() {
 
 	strafeSpeed := g.player.speed * 0.75 // slightly slower strafing
 
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
+	if engine.IsKeyPressed(engine.KeyW) {
 		g.movePlayer(moveSpeed, 0)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
+	if engine.IsKeyPressed(engine.KeyS) {
 		g.movePlayer(-moveSpeed, 0)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
+	if engine.IsKeyPressed(engine.KeyA) {
 		g.strafePlayer(-strafeSpeed)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
+	if engine.IsKeyPressed(engine.KeyD) {
 		g.strafePlayer(strafeSpeed)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyShift) {
+	if engine.IsKeyPressed(engine.KeyShift) {
 		g.player.speed = playerSpeedCrouching
 		g.adjustPlayerHeightOffset(playerCrouchingTransitionSpeed)
 	} else {
@@ -307,7 +305,7 @@ func (g *Game) handleInput() {
 
 	g.handleMouseLook()
 
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+	if engine.IsKeyPressed(engine.KeyEscape) {
 		os.Exit(0)
 	}
 }
@@ -329,7 +327,7 @@ func (g *Game) strafePlayer(speed float64) {
 }
 
 func (g *Game) handleMouseLook() {
-	cx, cy := ebiten.CursorPosition()
+	cx, cy := engine.CursorPosition()
 
 	if g.prevMouseX == 0 && g.prevMouseY == 0 {
 		g.prevMouseX, g.prevMouseY = cx, cy
@@ -388,9 +386,9 @@ func (g *Game) rotatePlayer(angle float64) {
 	g.player.planeY = oldPlaneX*math.Sin(angle) + g.player.planeY*math.Cos(angle)
 }
 
-func (g *Game) drawGameOver(screen *ebiten.Image) {
-	ebitenutil.DebugPrintAt(screen, "GAME OVER", screenWidth/2-40, screenHeight/2-10)
-	ebitenutil.DebugPrintAt(screen, "Press SPACE to restart", screenWidth/2-80, screenHeight/2+10)
+func (g *Game) drawGameOver(screen *engine.Image) {
+	engine.DebugPrintAt(screen, "GAME OVER", screenWidth/2-40, screenHeight/2-10)
+	engine.DebugPrintAt(screen, "Press SPACE to restart", screenWidth/2-80, screenHeight/2+10)
 }
 
 func (g *Game) calculateRayDirection(x int) (float64, float64) {
@@ -542,76 +540,76 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 	return entityColor
 }
 
-func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
-	screen.DrawImage(g.minimap, op)
+// func (g *Game) drawDynamicMinimap(screen *engine.Image) {
+// 	op := &engine.DrawImageOptions{}
+// 	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
+// 	screen.DrawImage(g.minimap, op)
 
-	// draw player
-	vector.DrawFilledCircle(
-		screen,
-		float32(screenWidth-g.level.width()*4-10+int(g.player.x*4)),
-		float32(10+int(g.player.y*4)),
-		2,
-		color.RGBA{255, 0, 0, 255},
-		false,
-	)
+// 	// draw player
+// 	vector.DrawFilledCircle(
+// 		screen,
+// 		float32(screenWidth-g.level.width()*4-10+int(g.player.x*4)),
+// 		float32(10+int(g.player.y*4)),
+// 		2,
+// 		color.RGBA{255, 0, 0, 255},
+// 		false,
+// 	)
 
-	// draw enemies
-	for _, enemy := range g.enemies {
-		vector.DrawFilledCircle(
-			screen,
-			float32(screenWidth-g.level.width()*4-10+int(enemy.x*4)),
-			float32(10+int(enemy.y*4)),
-			2,
-			color.RGBA{0, 255, 0, 255},
-			false,
-		)
-	}
+// 	// draw enemies
+// 	for _, enemy := range g.enemies {
+// 		vector.DrawFilledCircle(
+// 			screen,
+// 			float32(screenWidth-g.level.width()*4-10+int(enemy.x*4)),
+// 			float32(10+int(enemy.y*4)),
+// 			2,
+// 			color.RGBA{0, 255, 0, 255},
+// 			false,
+// 		)
+// 	}
 
-	// draw enemies and their field of vision
-	for _, enemy := range g.enemies {
-		enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
-		enemyY := float32(10 + int(enemy.y*4))
+// 	// draw enemies and their field of vision
+// 	for _, enemy := range g.enemies {
+// 		enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
+// 		enemyY := float32(10 + int(enemy.y*4))
 
-		// draw enemy
-		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{0, 255, 0, 255}, false)
+// 		// draw enemy
+// 		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{0, 255, 0, 255}, false)
 
-		// draw field of vision
-		leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
-		rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
+// 		// draw field of vision
+// 		leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
+// 		rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
 
-		leftX := enemyX + float32(math.Cos(leftAngle)*enemy.fovDistance*4)
-		leftY := enemyY + float32(math.Sin(leftAngle)*enemy.fovDistance*4)
-		rightX := enemyX + float32(math.Cos(rightAngle)*enemy.fovDistance*4)
-		rightY := enemyY + float32(math.Sin(rightAngle)*enemy.fovDistance*4)
+// 		leftX := enemyX + float32(math.Cos(leftAngle)*enemy.fovDistance*4)
+// 		leftY := enemyY + float32(math.Sin(leftAngle)*enemy.fovDistance*4)
+// 		rightX := enemyX + float32(math.Cos(rightAngle)*enemy.fovDistance*4)
+// 		rightY := enemyY + float32(math.Sin(rightAngle)*enemy.fovDistance*4)
 
-		vector.StrokeLine(screen, enemyX, enemyY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
-		vector.StrokeLine(screen, enemyX, enemyY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
-	}
-}
+// 		vector.StrokeLine(screen, enemyX, enemyY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
+// 		vector.StrokeLine(screen, enemyX, enemyY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
+// 	}
+// }
 
-func (g *Game) drawUI(screen *ebiten.Image) {
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()), 10, 10)
-	ebitenutil.DebugPrintAt(screen, "move with arrow keys", 10, screenHeight-40)
-	ebitenutil.DebugPrintAt(screen, "ESC to exit", 10, screenHeight-20)
+func (g *Game) drawUI(screen *engine.Image) {
+	engine.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", engine.ActualFPS()), 10, 10)
+	engine.DebugPrintAt(screen, "move with arrow keys", 10, screenHeight-40)
+	engine.DebugPrintAt(screen, "ESC to exit", 10, screenHeight-20)
 
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("height offset: %0.2f", g.player.heightOffset), 10, screenHeight-60)
+	engine.DebugPrintAt(screen, fmt.Sprintf("height offset: %0.2f", g.player.heightOffset), 10, screenHeight-60)
 
 	crouchStatus := "Standing"
 	if g.player.isCrouching {
 		crouchStatus = "Crouching"
 	}
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Status: %s", crouchStatus), 10, screenHeight-80)
+	engine.DebugPrintAt(screen, fmt.Sprintf("Status: %s", crouchStatus), 10, screenHeight-80)
 
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Player Detected: %t", isPlayerDetected), 10, screenHeight-100)
+	engine.DebugPrintAt(screen, fmt.Sprintf("Player Detected: %t", isPlayerDetected), 10, screenHeight-100)
 }
 
 var isPlayerDetected = false
 
 func (g *Game) Update() error {
 	if g.gameOver {
-		if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		if engine.IsKeyPressed(engine.KeySpace) {
 			// reset the game
 			*g = *NewGame()
 		}
@@ -636,7 +634,7 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
+func (g *Game) Draw(screen *engine.Image) {
 	if g.gameOver {
 		g.drawGameOver(screen)
 		return
@@ -653,9 +651,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	horizon := screenHeight/2 + int(float64(screenHeight)*math.Tan(g.player.verticalAngle))
 	for y := 0; y < screenHeight; y++ {
 		if y < horizon {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
+			engine.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor)
 		} else {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
+			engine.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor)
 		}
 	}
 
@@ -709,7 +707,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	g.drawDynamicMinimap(screen)
+	// g.drawDynamicMinimap(screen)
 	g.drawUI(screen)
 }
 
@@ -729,13 +727,13 @@ type Drawable struct {
 	enemy      *Enemy
 }
 
-func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, entity LevelEntity, side int) {
+func (g *Game) drawWallOrConstruct(screen *engine.Image, x int, dist float64, entity LevelEntity, side int) {
 	_, drawStart, drawEnd := g.calculateLineParameters(dist, entity)
 	wallColor := g.getEntityColor(entity, side)
-	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
+	engine.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor)
 }
 
-func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
+func (g *Game) drawEnemy(screen *engine.Image, enemy *Enemy, dist float64) {
 	spriteX := enemy.x - g.player.x
 	spriteY := enemy.y - g.player.y
 
@@ -812,9 +810,9 @@ func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
 		if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
 			texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(spriteWidth))
 
-			subImg := enemySprite.SubImage(image.Rect(texX, visibleStartY, texX+1, visibleEndY)).(*ebiten.Image)
+			subImg := enemySprite.SubImage(image.Rect(texX, visibleStartY, texX+1, visibleEndY))
 
-			op := &ebiten.DrawImageOptions{}
+			op := &engine.DrawImageOptions{}
 			scaleY := float64(drawEndY-drawStartY) / float64(visibleEndY-visibleStartY)
 			op.GeoM.Scale(1, scaleY)
 			op.GeoM.Translate(float64(stripe), float64(drawStartY))
@@ -829,13 +827,13 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("maze 3d raycasting")
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+	game := NewGame()
+	eng := engine.NewEngine(game)
+	defer eng.Destroy()
 
-	if err := ebiten.RunGame(NewGame()); err != nil {
-		log.Fatal(err)
-	}
+	engine.SetCursorMode(1) // CursorModeCaptured
+
+	eng.Run()
 }
 
 type LevelEntity int
