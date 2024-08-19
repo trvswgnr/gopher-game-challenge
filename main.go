@@ -95,7 +95,7 @@ func NewGame() *Game {
 		log.Fatal(err)
 	}
 	level := NewLevel(file)
-	playerX, playerY := level.GetPlayer()
+	playerX, playerY := level.getPlayer()
 	player := NewPlayer(playerX, playerY)
 
 	enemySprites := make(map[string]*ebiten.Image)
@@ -111,7 +111,7 @@ func NewGame() *Game {
 
 	g := &Game{
 		player:       player,
-		minimap:      ebiten.NewImage(level.Width()*4, level.Height()*4),
+		minimap:      ebiten.NewImage(level.width()*4, level.height()*4),
 		level:        level,
 		enemies:      make([]Enemy, 0),
 		gameOver:     false,
@@ -120,7 +120,7 @@ func NewGame() *Game {
 	}
 
 	// initialize enemies with patrol points
-	for _, enemyPos := range level.GetEnemies() {
+	for _, enemyPos := range level.getEnemies() {
 		enemy := Enemy{
 			x:            enemyPos.x,
 			y:            enemyPos.y,
@@ -136,9 +136,9 @@ func NewGame() *Game {
 	}
 
 	// generate static minimap
-	for y := 0; y < g.level.Height(); y++ {
-		for x := 0; x < g.level.Width(); x++ {
-			if g.level.GetEntityAt(x, y) == LevelEntity_Wall {
+	for y := 0; y < g.level.height(); y++ {
+		for x := 0; x < g.level.width(); x++ {
+			if g.level.getEntityAt(x, y) == LevelEntity_Wall {
 				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{50, 50, 50, 255}, false)
 			} else {
 				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
@@ -161,36 +161,12 @@ func generatePatrolPoints(level Level, startX, startY float64) []PatrolPoint {
 	// validate points (ensure they're not walls)
 	validPoints := make([]PatrolPoint, 0)
 	for _, p := range points {
-		if level.GetEntityAt(int(p.x), int(p.y)) != LevelEntity_Wall {
+		if level.getEntityAt(int(p.x), int(p.y)) != LevelEntity_Wall {
 			validPoints = append(validPoints, p)
 		}
 	}
 
 	return validPoints
-}
-
-func (g *Game) Update() error {
-	if g.gameOver {
-		if ebiten.IsKeyPressed(ebiten.KeySpace) {
-			// reset the game
-			*g = *NewGame()
-		}
-		return nil
-	}
-
-	g.handleInput()
-
-	// update enemies
-	for i := range g.enemies {
-		g.updateEnemy(&g.enemies[i])
-	}
-
-	// check if player is in enemy's field of vision
-	if g.isPlayerDetectedByEnemy() {
-		g.gameOver = false
-	}
-
-	return nil
 }
 
 func (g *Game) isPlayerDetectedByEnemy() bool {
@@ -259,7 +235,7 @@ func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
 	}
 
 	for n > 0 {
-		if g.level.GetEntityAt(x, y) == LevelEntity_Wall {
+		if g.level.getEntityAt(x, y) == LevelEntity_Wall {
 			return false
 		}
 
@@ -342,17 +318,17 @@ func (g *Game) movePlayer(speed float64) {
 
 func (g *Game) playerCollision(x, y float64) bool {
 	// check if the position is within the level bounds
-	if x < 0 || y < 0 || int(x) >= g.level.Width() || int(y) >= g.level.Height() {
+	if x < 0 || y < 0 || int(x) >= g.level.width() || int(y) >= g.level.height() {
 		return true
 	}
 
 	// check if the position is a wall
-	if g.level.GetEntityAt(int(x), int(y)) == LevelEntity_Wall {
+	if g.level.getEntityAt(int(x), int(y)) == LevelEntity_Wall {
 		return true
 	}
 
 	// check if the position is an enemy
-	if g.level.GetEntityAt(int(x), int(y)) == LevelEntity_Enemy {
+	if g.level.getEntityAt(int(x), int(y)) == LevelEntity_Enemy {
 		return true
 	}
 
@@ -366,39 +342,6 @@ func (g *Game) rotatePlayer(angle float64) {
 	oldPlaneX := g.player.planeX
 	g.player.planeX = g.player.planeX*math.Cos(angle) - g.player.planeY*math.Sin(angle)
 	g.player.planeY = oldPlaneX*math.Sin(angle) + g.player.planeY*math.Cos(angle)
-}
-
-func (g *Game) Draw(screen *ebiten.Image) {
-	if g.gameOver {
-		g.drawGameOver(screen)
-		return
-	}
-
-	for i := range g.zBuffer {
-		g.zBuffer[i] = math.Inf(1)
-	}
-
-	// draw the floor and ceiling
-	floorColor := color.RGBA{30, 30, 30, 255}
-	ceilingColor := color.RGBA{160, 227, 254, 255}
-	for y := 0; y < screenHeight; y++ {
-		if y < screenHeight/2 {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
-		} else {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
-		}
-	}
-
-	// draw blocks and enemies
-	for x := 0; x < screenWidth; x++ {
-		rayDirX, rayDirY := g.calculateRayDirection(x)
-		entities := g.castRay(x, rayDirX, rayDirY)
-		g.drawEntities(screen, x, entities)
-	}
-
-	g.drawEnemies(screen)
-	g.drawDynamicMinimap(screen)
-	g.drawUI(screen)
 }
 
 func (g *Game) drawEnemies(screen *ebiten.Image) {
@@ -552,7 +495,7 @@ func (g *Game) castRay(x int, rayDirX, rayDirY float64) []struct {
 			mapY += stepY
 			side = 1
 		}
-		hitEntity := g.level.GetEntityAt(mapX, mapY)
+		hitEntity := g.level.getEntityAt(mapX, mapY)
 		if hitEntity != LevelEntity_Empty {
 			var dist float64
 			if side == 0 {
@@ -664,13 +607,13 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 
 func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(screenWidth-g.level.Width()*4-10), 10)
+	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
 	screen.DrawImage(g.minimap, op)
 
 	// draw player
 	vector.DrawFilledCircle(
 		screen,
-		float32(screenWidth-g.level.Width()*4-10+int(g.player.x*4)),
+		float32(screenWidth-g.level.width()*4-10+int(g.player.x*4)),
 		float32(10+int(g.player.y*4)),
 		2,
 		color.RGBA{255, 0, 0, 255},
@@ -681,7 +624,7 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 	for _, enemy := range g.enemies {
 		vector.DrawFilledCircle(
 			screen,
-			float32(screenWidth-g.level.Width()*4-10+int(enemy.x*4)),
+			float32(screenWidth-g.level.width()*4-10+int(enemy.x*4)),
 			float32(10+int(enemy.y*4)),
 			2,
 			color.RGBA{0, 255, 0, 255},
@@ -691,7 +634,7 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 
 	// draw enemies and their field of vision
 	for _, enemy := range g.enemies {
-		enemyX := float32(screenWidth - g.level.Width()*4 - 10 + int(enemy.x*4))
+		enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
 		enemyY := float32(10 + int(enemy.y*4))
 
 		// draw enemy
@@ -723,6 +666,63 @@ func (g *Game) drawUI(screen *ebiten.Image) {
 		crouchStatus = "Crouching"
 	}
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Status: %s", crouchStatus), 10, screenHeight-80)
+}
+
+func (g *Game) Update() error {
+	if g.gameOver {
+		if ebiten.IsKeyPressed(ebiten.KeySpace) {
+			// reset the game
+			*g = *NewGame()
+		}
+		return nil
+	}
+
+	g.handleInput()
+
+	// update enemies
+	for i := range g.enemies {
+		g.updateEnemy(&g.enemies[i])
+	}
+
+	// check if player is in enemy's field of vision
+	if g.isPlayerDetectedByEnemy() {
+		g.gameOver = false
+	}
+
+	return nil
+}
+
+func (g *Game) Draw(screen *ebiten.Image) {
+	if g.gameOver {
+		g.drawGameOver(screen)
+		return
+	}
+
+	for i := range g.zBuffer {
+		g.zBuffer[i] = math.Inf(1)
+	}
+
+	// draw the floor and ceiling
+	floorColor := color.RGBA{30, 30, 30, 255}
+	ceilingColor := color.RGBA{160, 227, 254, 255}
+	for y := 0; y < screenHeight; y++ {
+		if y < screenHeight/2 {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
+		} else {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
+		}
+	}
+
+	// draw blocks and enemies
+	for x := 0; x < screenWidth; x++ {
+		rayDirX, rayDirY := g.calculateRayDirection(x)
+		entities := g.castRay(x, rayDirX, rayDirY)
+		g.drawEntities(screen, x, entities)
+	}
+
+	g.drawEnemies(screen)
+	g.drawDynamicMinimap(screen)
+	g.drawUI(screen)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -803,7 +803,7 @@ func NewLevel(file fs.File) Level {
 	return matrix
 }
 
-func (level Level) GetPlayer() (float64, float64) {
+func (level Level) getPlayer() (float64, float64) {
 	playerX := 0
 	playerY := 0
 	for y := 0; y < len(level); y++ {
@@ -821,7 +821,7 @@ func (level Level) GetPlayer() (float64, float64) {
 	return float64(playerX), float64(playerY)
 }
 
-func (level Level) GetEnemies() []Enemy {
+func (level Level) getEnemies() []Enemy {
 	enemies := []Enemy{}
 	for y := 0; y < len(level); y++ {
 		for x := 0; x < len(level[y]); x++ {
@@ -834,22 +834,6 @@ func (level Level) GetEnemies() []Enemy {
 	return enemies
 }
 
-func (l Level) Width() int {
-	return len(l[0])
-}
-
-func (l Level) Height() int {
-	return len(l)
-}
-
-func (l Level) Fwidth() float64 {
-	return float64(len(l[0]))
-}
-
-func (l Level) Fheight() float64 {
-	return float64(len(l))
-}
-
-func (l Level) GetEntityAt(x, y int) LevelEntity {
-	return l[y][x]
-}
+func (l Level) width() int                       { return len(l[0]) }
+func (l Level) height() int                      { return len(l) }
+func (l Level) getEntityAt(x, y int) LevelEntity { return l[y][x] }
