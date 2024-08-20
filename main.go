@@ -887,41 +887,44 @@ func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, en
 	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
 }
 
+type SpriteParameters struct {
+	spriteScreenX int
+	transformY    float64
+	spriteHeight  int
+	spriteWidth   int
+	drawStartY    int
+	drawEndY      int
+	drawStartX    int
+	drawEndX      int
+}
+
+type SpriteVisiblePortion struct {
+	visibleStartY int
+	visibleEndY   int
+	drawStartY    int
+	drawEndY      int
+	drawStartX    int
+	drawEndX      int
+}
+
 func (g *Game) drawEnemy(screen *ebiten.Image, d Drawable) {
 	enemy := d.enemy
-	spriteScreenX := d.spriteScreenX
-	transformY := d.transformY
-
-	// calculate sprite dimensions on screen
-	spriteHeight := int(math.Abs(float64(screenHeight) / transformY))
-	spriteWidth := int(math.Abs(float64(screenHeight) / transformY))
-
-	// adjust vertical position based on player height
-	vMoveScreen := int(float64(spriteHeight) * (0.5 - g.player.heightOffset))
-	drawStartY := -spriteHeight/2 + screenHeight/2 + vMoveScreen
-	drawEndY := spriteHeight/2 + screenHeight/2 + vMoveScreen
-	drawStartX := -spriteWidth/2 + spriteScreenX
-	drawEndX := spriteWidth/2 + spriteScreenX
-
-	// adjust for player's vertical look angle
-	verticalAngleOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
-	drawStartY += verticalAngleOffset
-	drawEndY += verticalAngleOffset
+	params := g.calculateSpriteParameters(d)
 
 	// determine which sprite to use based on enemy's orientation relative to player
 	enemyToPlayerX := g.player.x - enemy.x
 	enemyToPlayerY := g.player.y - enemy.y
-	angle := math.Atan2(enemyToPlayerY, enemyToPlayerX) - math.Atan2(enemy.dirY, enemy.dirX)
 
-	// normalize angle to [-π, π]
-	for angle < -math.Pi {
-		angle += 2 * math.Pi
-	}
-	for angle > math.Pi {
-		angle -= 2 * math.Pi
-	}
+	angle := getNormalizedAngle(enemyToPlayerY, enemyToPlayerX, enemy)
 
-	// select appropriate sprite based on angle
+	enemySprite := g.getEnemySpriteForAngle(angle)
+
+	visiblePortion := getVisiblePortionOfSprite(enemySprite, params)
+
+	g.drawSprite(screen, enemySprite, params, visiblePortion)
+}
+
+func (g *Game) getEnemySpriteForAngle(angle float64) *ebiten.Image {
 	var spriteName string
 	if math.Abs(angle) < math.Pi/6 {
 		spriteName = "front"
@@ -936,43 +939,85 @@ func (g *Game) drawEnemy(screen *ebiten.Image, d Drawable) {
 	} else {
 		spriteName = "front-right"
 	}
-	enemySprite := g.enemySprites[spriteName]
 
-	// calculate visible portion of sprite
+	enemySprite := g.enemySprites[spriteName]
+	return enemySprite
+}
+
+func (g *Game) calculateSpriteParameters(d Drawable) SpriteParameters {
+	params := SpriteParameters{
+		spriteScreenX: d.spriteScreenX,
+		transformY:    d.transformY,
+	}
+
+	params.spriteHeight = int(math.Abs(float64(screenHeight) / params.transformY))
+	params.spriteWidth = int(math.Abs(float64(screenHeight) / params.transformY))
+
+	vMoveScreen := int(float64(params.spriteHeight) * (0.5 - g.player.heightOffset))
+
+	params.drawStartY = -params.spriteHeight/2 + screenHeight/2 + vMoveScreen
+	params.drawEndY = params.spriteHeight/2 + screenHeight/2 + vMoveScreen
+
+	params.drawStartX = -params.spriteWidth/2 + params.spriteScreenX
+	params.drawEndX = params.spriteWidth/2 + params.spriteScreenX
+
+	verticalAngleOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
+
+	params.drawStartY += verticalAngleOffset
+	params.drawEndY += verticalAngleOffset
+
+	return params
+}
+
+// normalize angle to [-π, π]
+func getNormalizedAngle(enemyToPlayerY float64, enemyToPlayerX float64, enemy *Enemy) float64 {
+	angle := math.Atan2(enemyToPlayerY, enemyToPlayerX) - math.Atan2(enemy.dirY, enemy.dirX)
+	for angle < -math.Pi {
+		angle += 2 * math.Pi
+	}
+	for angle > math.Pi {
+		angle -= 2 * math.Pi
+	}
+	return angle
+}
+
+func getVisiblePortionOfSprite(enemySprite *ebiten.Image, params SpriteParameters) SpriteVisiblePortion {
 	visibleStartY := 0
 	visibleEndY := enemySprite.Bounds().Dy()
-	if drawStartY < 0 {
-		visibleStartY = -drawStartY * enemySprite.Bounds().Dy() / spriteHeight
-		drawStartY = 0
+	if params.drawStartY < 0 {
+		visibleStartY = -params.drawStartY * enemySprite.Bounds().Dy() / params.spriteHeight
+		params.drawStartY = 0
 	}
-	if drawEndY >= screenHeight {
-		visibleEndY = (screenHeight - drawStartY) * enemySprite.Bounds().Dy() / spriteHeight
-		drawEndY = screenHeight - 1
+	if params.drawEndY >= screenHeight {
+		visibleEndY = (screenHeight - params.drawStartY) * enemySprite.Bounds().Dy() / params.spriteHeight
+		params.drawEndY = screenHeight - 1
 	}
-	if drawStartX < 0 {
-		drawStartX = 0
+	if params.drawStartX < 0 {
+		params.drawStartX = 0
 	}
-	if drawEndX >= screenWidth {
-		drawEndX = screenWidth - 1
+	if params.drawEndX >= screenWidth {
+		params.drawEndX = screenWidth - 1
 	}
+	return SpriteVisiblePortion{
+		visibleStartY: visibleStartY,
+		visibleEndY:   visibleEndY,
+		drawStartY:    params.drawStartY,
+		drawEndY:      params.drawEndY,
+		drawStartX:    params.drawStartX,
+		drawEndX:      params.drawEndX,
+	}
+}
 
-	// draw sprite column by column
-	for stripe := drawStartX; stripe < drawEndX; stripe++ {
-		// check if stripe is visible and in front of walls
-		if transformY > 0 && stripe > 0 && stripe < screenWidth && transformY < g.zBuffer[stripe] {
-			// calculate texture x coordinate
-			texX := int((float64(stripe-(-spriteWidth/2+spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(spriteWidth))
-
-			// create sub-image for the current stripe
-			subImg := enemySprite.SubImage(image.Rect(texX, visibleStartY, texX+1, visibleEndY)).(*ebiten.Image)
-
-			// set up drawing options
+// draw sprite column by column
+func (g *Game) drawSprite(screen *ebiten.Image, enemySprite *ebiten.Image, params SpriteParameters, visiblePortion SpriteVisiblePortion) {
+	for stripe := visiblePortion.drawStartX; stripe < visiblePortion.drawEndX; stripe++ {
+		if params.transformY > 0 && stripe > 0 && stripe < screenWidth && params.transformY < g.zBuffer[stripe] {
 			op := &ebiten.DrawImageOptions{}
-			scaleY := float64(drawEndY-drawStartY) / float64(visibleEndY-visibleStartY)
+			texX := int((float64(stripe-(-params.spriteWidth/2+params.spriteScreenX)) * float64(enemySprite.Bounds().Dx())) / float64(params.spriteWidth))
+			subImg := enemySprite.SubImage(image.Rect(texX, visiblePortion.visibleStartY, texX+1, visiblePortion.visibleEndY)).(*ebiten.Image)
+			scaleY := float64(visiblePortion.drawEndY-visiblePortion.drawStartY) / float64(visiblePortion.visibleEndY-visiblePortion.visibleStartY)
 			op.GeoM.Scale(1, scaleY)
-			op.GeoM.Translate(float64(stripe), float64(drawStartY))
-
-			// draw the sprite stripe
+			op.GeoM.Translate(float64(stripe), float64(visiblePortion.drawStartY))
 			screen.DrawImage(subImg, op)
 		}
 	}
