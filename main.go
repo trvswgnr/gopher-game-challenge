@@ -617,19 +617,47 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 }
 
 func (g *Game) drawMinimapPlayer(screen *ebiten.Image) {
-	// teal if crouching, green if not
-	playerColor := color.RGBA{0, 255, 255, 255}
-	if g.player.isCrouching {
-		playerColor = color.RGBA{0, 255, 0, 255}
+	// calculate player position on minimap
+	playerX := float32(screenWidth - g.level.width()*4 - 10 + int(g.player.x*4))
+	playerY := float32(10 + int(g.player.y*4))
+
+	// calculate triangle points
+	triangleSize := float32(4)
+	angle := math.Atan2(g.player.dirY, g.player.dirX)
+
+	x1 := playerX + triangleSize*float32(math.Cos(angle))
+	y1 := playerY + triangleSize*float32(math.Sin(angle))
+
+	x2 := playerX + triangleSize*float32(math.Cos(angle+2.5))
+	y2 := playerY + triangleSize*float32(math.Sin(angle+2.5))
+
+	x3 := playerX + triangleSize*float32(math.Cos(angle-2.5))
+	y3 := playerY + triangleSize*float32(math.Sin(angle-2.5))
+
+	// define triangle vertices
+	vertices := []ebiten.Vertex{
+		{DstX: x1, DstY: y1, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: x2, DstY: y2, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: x3, DstY: y3, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
 	}
-	vector.DrawFilledCircle(
-		screen,
-		float32(screenWidth-g.level.width()*4-10+int(g.player.x*4)),
-		float32(10+int(g.player.y*4)),
-		2,
-		playerColor,
-		false,
-	)
+
+	// define triangle indices
+	indices := []uint16{0, 1, 2}
+
+	// choose color based on crouching state
+	var playerColor color.RGBA
+	if g.player.isCrouching {
+		playerColor = color.RGBA{0, 255, 0, 255} // green when crouching
+	} else {
+		playerColor = color.RGBA{0, 255, 255, 255} // teal when standing
+	}
+
+	// create a 1x1 image with the player color
+	playerColorImage := ebiten.NewImage(1, 1)
+	playerColorImage.Fill(playerColor)
+
+	// draw the triangle
+	screen.DrawTriangles(vertices, indices, playerColorImage, nil)
 }
 
 func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
