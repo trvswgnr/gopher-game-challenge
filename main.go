@@ -40,6 +40,7 @@ type Game struct {
 	enemySprites           map[string]*ebiten.Image
 	zBuffer                []float64
 	prevMouseX, prevMouseY int
+	discoveredAreas        [][]float64
 }
 
 type Direction int
@@ -104,22 +105,51 @@ func NewGame() *Game {
 	player := NewPlayer(playerX, playerY)
 
 	g := &Game{
-		player:       player,
-		minimap:      ebiten.NewImage(level.width()*4, level.height()*4),
-		level:        level,
-		enemies:      make([]Enemy, 0),
-		gameOver:     false,
-		enemySprites: loadEnemySprites(),
-		zBuffer:      make([]float64, screenWidth),
-		prevMouseX:   0,
-		prevMouseY:   0,
+		player:          player,
+		minimap:         ebiten.NewImage(level.width()*4, level.height()*4),
+		level:           level,
+		enemies:         make([]Enemy, 0),
+		gameOver:        false,
+		enemySprites:    loadEnemySprites(),
+		zBuffer:         make([]float64, screenWidth),
+		prevMouseX:      0,
+		prevMouseY:      0,
+		discoveredAreas: make([][]float64, level.height()),
+	}
+
+	for i := range g.discoveredAreas {
+		g.discoveredAreas[i] = make([]float64, level.width())
 	}
 
 	g.initializeEnemies()
 
 	g.generateStaticMinimap()
 
+	g.updateDiscoveredAreas()
+
 	return g
+}
+
+func (g *Game) updateDiscoveredAreas() {
+	discoveryRadius := 5.0 // Adjust this value to change the discovery radius
+	fadeRadius := 2.0      // Adjust this value to change the fade effect
+	playerX, playerY := int(g.player.x), int(g.player.y)
+
+	for y := playerY - int(discoveryRadius) - int(fadeRadius); y <= playerY+int(discoveryRadius)+int(fadeRadius); y++ {
+		for x := playerX - int(discoveryRadius) - int(fadeRadius); x <= playerX+int(discoveryRadius)+int(fadeRadius); x++ {
+			if x >= 0 && x < g.level.width() && y >= 0 && y < g.level.height() {
+				dx, dy := float64(x-playerX), float64(y-playerY)
+				distance := math.Sqrt(dx*dx + dy*dy)
+
+				if distance <= discoveryRadius {
+					g.discoveredAreas[y][x] = 1.0
+				} else if distance <= discoveryRadius+fadeRadius {
+					fade := 1.0 - (distance-discoveryRadius)/fadeRadius
+					g.discoveredAreas[y][x] = math.Max(g.discoveredAreas[y][x], fade)
+				}
+			}
+		}
+	}
 }
 
 func loadEnemySprites() map[string]*ebiten.Image {
@@ -550,12 +580,39 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 }
 
 func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
+	minimapImage := ebiten.NewImage(g.level.width()*4, g.level.height()*4)
+
+	for y := 0; y < g.level.height(); y++ {
+		for x := 0; x < g.level.width(); x++ {
+			visibility := g.discoveredAreas[y][x]
+			if visibility > 0 {
+				var tileColor color.RGBA
+				switch g.level.getEntityAt(x, y) {
+				case LevelEntity_Wall:
+					tileColor = color.RGBA{50, 50, 50, 255}
+				case LevelEntity_Construct:
+					tileColor = color.RGBA{140, 140, 140, 255}
+				default:
+					tileColor = color.RGBA{200, 200, 200, 255}
+				}
+
+				// Apply fog effect
+				tileColor.R = uint8(float64(tileColor.R) * visibility)
+				tileColor.G = uint8(float64(tileColor.G) * visibility)
+				tileColor.B = uint8(float64(tileColor.B) * visibility)
+
+				vector.DrawFilledRect(minimapImage, float32(x*4), float32(y*4), 4, 4, tileColor, false)
+			} else {
+				vector.DrawFilledRect(minimapImage, float32(x*4), float32(y*4), 4, 4, color.RGBA{20, 20, 20, 255}, false)
+			}
+		}
+	}
+
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
-	screen.DrawImage(g.minimap, op)
+	screen.DrawImage(minimapImage, op)
 
 	g.drawMinimapPlayer(screen)
-
 	g.drawMinimapEnemies(screen)
 }
 
@@ -576,44 +633,29 @@ func (g *Game) drawMinimapPlayer(screen *ebiten.Image) {
 }
 
 func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
-	if len(g.enemies) == 0 {
-		return
-	}
+	for _, enemy := range g.enemies {
+		enemyX, enemyY := int(enemy.x), int(enemy.y)
 
-	// find the closest enemy
-	closestEnemy := &g.enemies[0]
-	closestDistSquared := math.Inf(1)
+		if g.discoveredAreas[enemyY][enemyX] > 0 {
+			screenX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
+			screenY := float32(10 + int(enemy.y*4))
 
-	for i := range g.enemies {
-		enemy := &g.enemies[i]
-		dx := enemy.x - g.player.x
-		dy := enemy.y - g.player.y
-		distSquared := dx*dx + dy*dy
+			// Draw enemy
+			vector.DrawFilledCircle(screen, screenX, screenY, 2, color.RGBA{255, 0, 0, 255}, false)
 
-		if distSquared < closestDistSquared {
-			closestDistSquared = distSquared
-			closestEnemy = enemy
+			// Draw field of vision
+			leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
+			rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
+
+			leftX := screenX + float32(math.Cos(leftAngle)*enemy.fovDistance*4)
+			leftY := screenY + float32(math.Sin(leftAngle)*enemy.fovDistance*4)
+			rightX := screenX + float32(math.Cos(rightAngle)*enemy.fovDistance*4)
+			rightY := screenY + float32(math.Sin(rightAngle)*enemy.fovDistance*4)
+
+			vector.StrokeLine(screen, screenX, screenY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
+			vector.StrokeLine(screen, screenX, screenY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
 		}
 	}
-
-	// draw only the closest enemy and its field of vision
-	enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(closestEnemy.x*4))
-	enemyY := float32(10 + int(closestEnemy.y*4))
-
-	// draw enemy
-	vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{255, 0, 0, 255}, false)
-
-	// draw field of vision
-	leftAngle := math.Atan2(closestEnemy.dirY, closestEnemy.dirX) - closestEnemy.fovAngle/2
-	rightAngle := math.Atan2(closestEnemy.dirY, closestEnemy.dirX) + closestEnemy.fovAngle/2
-
-	leftX := enemyX + float32(math.Cos(leftAngle)*closestEnemy.fovDistance*4)
-	leftY := enemyY + float32(math.Sin(leftAngle)*closestEnemy.fovDistance*4)
-	rightX := enemyX + float32(math.Cos(rightAngle)*closestEnemy.fovDistance*4)
-	rightY := enemyY + float32(math.Sin(rightAngle)*closestEnemy.fovDistance*4)
-
-	vector.StrokeLine(screen, enemyX, enemyY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
-	vector.StrokeLine(screen, enemyX, enemyY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
 }
 
 func (g *Game) drawUI(screen *ebiten.Image) {
@@ -644,6 +686,7 @@ func (g *Game) Update() error {
 	}
 
 	g.handleInput()
+	g.updateDiscoveredAreas()
 
 	// update enemies
 	for i := range g.enemies {
