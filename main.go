@@ -131,8 +131,8 @@ func NewGame() *Game {
 }
 
 func (g *Game) updateDiscoveredAreas() {
-	discoveryRadius := 5.0 // Adjust this value to change the discovery radius
-	fadeRadius := 2.0      // Adjust this value to change the fade effect
+	const discoveryRadius float64 = 5.0 // changes the discovery radius
+	const fadeRadius float64 = 2.0      // changes the fade effect radius
 	playerX, playerY := int(g.player.x), int(g.player.y)
 
 	for y := playerY - int(discoveryRadius) - int(fadeRadius); y <= playerY+int(discoveryRadius)+int(fadeRadius); y++ {
@@ -596,7 +596,7 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 					tileColor = color.RGBA{200, 200, 200, 255}
 				}
 
-				// Apply fog effect
+				// apply fog effect
 				tileColor.R = uint8(float64(tileColor.R) * visibility)
 				tileColor.G = uint8(float64(tileColor.G) * visibility)
 				tileColor.B = uint8(float64(tileColor.B) * visibility)
@@ -640,23 +640,72 @@ func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
 			screenX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
 			screenY := float32(10 + int(enemy.y*4))
 
-			// Draw enemy
+			// draw enemy (red)
 			vector.DrawFilledCircle(screen, screenX, screenY, 2, color.RGBA{255, 0, 0, 255}, false)
 
-			// Draw field of vision
-			leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
-			rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
+			// draw field of vision
+			centerAngle := math.Atan2(enemy.dirY, enemy.dirX)
+			leftAngle := centerAngle - enemy.fovAngle/2
+			rightAngle := centerAngle + enemy.fovAngle/2
 
-			leftX := screenX + float32(math.Cos(leftAngle)*enemy.fovDistance*4)
-			leftY := screenY + float32(math.Sin(leftAngle)*enemy.fovDistance*4)
-			rightX := screenX + float32(math.Cos(rightAngle)*enemy.fovDistance*4)
-			rightY := screenY + float32(math.Sin(rightAngle)*enemy.fovDistance*4)
+			// create vertices for the fov arc
+			const segments = 20
+			vertices := make([]ebiten.Vertex, segments+2)
+			indices := make([]uint16, (segments+1)*3)
 
-			vector.StrokeLine(screen, screenX, screenY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
-			vector.StrokeLine(screen, screenX, screenY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
+			// center vertex
+			vertices[0] = ebiten.Vertex{
+				DstX:   screenX,
+				DstY:   screenY,
+				SrcX:   0,
+				SrcY:   0,
+				ColorR: 1,
+				ColorG: 1,
+				ColorB: 0,
+				ColorA: 0.25,
+			}
+
+			// arc vertices
+			for i := 0; i <= segments; i++ {
+				angle := leftAngle + (rightAngle-leftAngle)*float64(i)/float64(segments)
+				x := screenX + float32(math.Cos(angle)*enemy.fovDistance*4)
+				y := screenY + float32(math.Sin(angle)*enemy.fovDistance*4)
+				vertices[i+1] = ebiten.Vertex{
+					DstX:   x,
+					DstY:   y,
+					SrcX:   0,
+					SrcY:   0,
+					ColorR: 1,
+					ColorG: 1,
+					ColorB: 0,
+					ColorA: 0.25,
+				}
+
+				if i < segments {
+					indices[i*3] = 0
+					indices[i*3+1] = uint16(i + 1)
+					indices[i*3+2] = uint16(i + 2)
+				}
+			}
+
+			// draw the filled fov arc
+			screen.DrawTriangles(vertices, indices, emptySubImage, &ebiten.DrawTrianglesOptions{
+				CompositeMode: ebiten.CompositeModeLighter,
+			})
+
+			// draw the fov outline
+			for i := 0; i <= segments; i++ {
+				if i < segments {
+					vector.StrokeLine(screen, vertices[i+1].DstX, vertices[i+1].DstY, vertices[i+2].DstX, vertices[i+2].DstY, 1, color.RGBA{255, 255, 0, 128}, false)
+				}
+			}
+			vector.StrokeLine(screen, screenX, screenY, vertices[1].DstX, vertices[1].DstY, 1, color.RGBA{255, 255, 0, 128}, false)
+			vector.StrokeLine(screen, screenX, screenY, vertices[segments+1].DstX, vertices[segments+1].DstY, 1, color.RGBA{255, 255, 0, 128}, false)
 		}
 	}
 }
+
+var emptySubImage = ebiten.NewImage(3, 3).SubImage(image.Rect(1, 1, 2, 2)).(*ebiten.Image)
 
 func (g *Game) drawUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()), 10, 10)
