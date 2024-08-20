@@ -29,6 +29,7 @@ const (
 	playerCrouchingHeightOffset    float64 = 0.6
 	playerCrouchingTransitionSpeed float64 = 0.03
 	mouseSensitivity               float64 = 0.002
+	minimapScale                   int     = 8
 )
 
 type Game struct {
@@ -106,7 +107,7 @@ func NewGame() *Game {
 
 	g := &Game{
 		player:          player,
-		minimap:         ebiten.NewImage(level.width()*4, level.height()*4),
+		minimap:         ebiten.NewImage(level.width()*minimapScale, level.height()*minimapScale),
 		level:           level,
 		enemies:         make([]Enemy, 0),
 		gameOver:        false,
@@ -189,15 +190,16 @@ func (g *Game) initializeEnemies() {
 }
 
 func (g *Game) generateStaticMinimap() {
+	g.minimap = ebiten.NewImage(g.level.width()*minimapScale, g.level.height()*minimapScale)
 	for y := 0; y < g.level.height(); y++ {
 		for x := 0; x < g.level.width(); x++ {
 			switch g.level.getEntityAt(x, y) {
 			case LevelEntity_Wall:
-				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{50, 50, 50, 255}, false)
+				vector.DrawFilledRect(g.minimap, float32(x*minimapScale), float32(y*minimapScale), float32(minimapScale), float32(minimapScale), color.RGBA{50, 50, 50, 255}, false)
 			case LevelEntity_Construct:
-				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
+				vector.DrawFilledRect(g.minimap, float32(x*minimapScale), float32(y*minimapScale), float32(minimapScale), float32(minimapScale), color.RGBA{140, 140, 140, 255}, false)
 			default:
-				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
+				vector.DrawFilledRect(g.minimap, float32(x*minimapScale), float32(y*minimapScale), float32(minimapScale), float32(minimapScale), color.RGBA{140, 140, 140, 255}, false)
 			}
 		}
 	}
@@ -580,7 +582,7 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 }
 
 func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
-	minimapImage := ebiten.NewImage(g.level.width()*4, g.level.height()*4)
+	minimapImage := ebiten.NewImage(g.level.width()*minimapScale, g.level.height()*minimapScale)
 
 	for y := 0; y < g.level.height(); y++ {
 		for x := 0; x < g.level.width(); x++ {
@@ -601,15 +603,15 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 				tileColor.G = uint8(float64(tileColor.G) * visibility)
 				tileColor.B = uint8(float64(tileColor.B) * visibility)
 
-				vector.DrawFilledRect(minimapImage, float32(x*4), float32(y*4), 4, 4, tileColor, false)
+				vector.DrawFilledRect(minimapImage, float32(x*minimapScale), float32(y*minimapScale), float32(minimapScale), float32(minimapScale), tileColor, false)
 			} else {
-				vector.DrawFilledRect(minimapImage, float32(x*4), float32(y*4), 4, 4, color.RGBA{20, 20, 20, 255}, false)
+				vector.DrawFilledRect(minimapImage, float32(x*minimapScale), float32(y*minimapScale), float32(minimapScale), float32(minimapScale), color.RGBA{20, 20, 20, 255}, false)
 			}
 		}
 	}
 
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
+	op.GeoM.Translate(float64(screenWidth-g.level.width()*minimapScale-10), 10)
 	screen.DrawImage(minimapImage, op)
 
 	g.drawMinimapPlayer(screen)
@@ -618,11 +620,11 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 
 func (g *Game) drawMinimapPlayer(screen *ebiten.Image) {
 	// calculate player position on minimap
-	playerX := float32(screenWidth - g.level.width()*4 - 10 + int(g.player.x*4))
-	playerY := float32(10 + int(g.player.y*4))
+	playerX := float32(screenWidth - g.level.width()*minimapScale - 10 + int(g.player.x*float64(minimapScale)))
+	playerY := float32(10 + int(g.player.y*float64(minimapScale)))
 
 	// calculate triangle points
-	triangleSize := float32(4)
+	triangleSize := float32(minimapScale)
 	angle := math.Atan2(g.player.dirY, g.player.dirX)
 
 	x1 := playerX + triangleSize*float32(math.Cos(angle))
@@ -665,11 +667,11 @@ func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
 		enemyX, enemyY := int(enemy.x), int(enemy.y)
 
 		if g.discoveredAreas[enemyY][enemyX] > 0 {
-			screenX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
-			screenY := float32(10 + int(enemy.y*4))
+			screenX := float32(screenWidth - g.level.width()*minimapScale - 10 + int(enemy.x*float64(minimapScale)))
+			screenY := float32(10 + int(enemy.y*float64(minimapScale)))
 
 			// draw enemy (red)
-			vector.DrawFilledCircle(screen, screenX, screenY, 2, color.RGBA{255, 0, 0, 255}, false)
+			vector.DrawFilledCircle(screen, screenX, screenY, float32(minimapScale)/2, color.RGBA{255, 0, 0, 255}, false)
 
 			// draw field of vision
 			centerAngle := math.Atan2(enemy.dirY, enemy.dirX)
@@ -696,8 +698,8 @@ func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
 			// arc vertices
 			for i := 0; i <= segments; i++ {
 				angle := leftAngle + (rightAngle-leftAngle)*float64(i)/float64(segments)
-				x := screenX + float32(math.Cos(angle)*enemy.fovDistance*4)
-				y := screenY + float32(math.Sin(angle)*enemy.fovDistance*4)
+				x := screenX + float32(math.Cos(angle)*enemy.fovDistance*float64(minimapScale))
+				y := screenY + float32(math.Sin(angle)*enemy.fovDistance*float64(minimapScale))
 				vertices[i+1] = ebiten.Vertex{
 					DstX:   x,
 					DstY:   y,
