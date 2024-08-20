@@ -201,31 +201,45 @@ func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
 
 	if distToPlayer <= enemy.fovDistance && angleDiff <= enemy.fovAngle/2 {
 		// check if there's a clear line of sight
-		if g.hasLineOfSight(enemy.x, enemy.y, g.player.x, g.player.y) {
-			// if the player is crouching, check if they're hidden behind a construct
-			if g.player.isCrouching {
-				playerTileX, playerTileY := int(g.player.x), int(g.player.y)
+		steps := int(distToPlayer * 100) // change to adjust precision
+		lastConstructHeight := 0.0
 
-				// check tiles between enemy and player for constructs
-				steps := int(distToPlayer * 2)
-				for i := 0; i <= steps; i++ {
-					t := float64(i) / float64(steps)
-					checkX := enemy.x + t*dx
-					checkY := enemy.y + t*dy
-					checkTileX, checkTileY := int(checkX), int(checkY)
+		for i := 0; i <= steps; i++ {
+			t := float64(i) / float64(steps)
+			checkX := enemy.x + t*dx
+			checkY := enemy.y + t*dy
+			checkTileX, checkTileY := int(checkX), int(checkY)
 
-					// if we've reached the player's tile, stop checking
-					if checkTileX == playerTileX && checkTileY == playerTileY {
-						break
-					}
+			// check for out of bounds
+			if checkTileX < 0 || checkTileX >= g.level.width() || checkTileY < 0 || checkTileY >= g.level.height() {
+				return false
+			}
 
-					// if we find a construct, the player is hidden
-					if g.level.getEntityAt(checkTileX, checkTileY) == LevelEntity_Construct {
-						return false
-					}
+			entity := g.level.getEntityAt(checkTileX, checkTileY)
+
+			// if we hit a wall, enemy can't see player
+			if entity == LevelEntity_Wall {
+				return false
+			}
+
+			// if we hit a construct
+			if entity == LevelEntity_Construct {
+				constructHeight := 0.5 // adjust this value based on your construct height
+				lastConstructHeight = constructHeight
+
+				// if this is the last step (player's position) and player is crouching
+				if i == steps && g.player.isCrouching {
+					return false // player is hidden behind the construct
 				}
 			}
-			return true
+
+			// we've reached the player's position
+			if checkTileX == int(g.player.x) && checkTileY == int(g.player.y) {
+				if g.player.isCrouching && lastConstructHeight > 0 {
+					return false // player is crouching and there was a construct in the line of sight
+				}
+				return true // player can be seen
+			}
 		}
 	}
 	return false
