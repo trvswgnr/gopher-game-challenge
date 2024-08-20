@@ -381,9 +381,14 @@ func (g *Game) calculateSpriteParameters(d Drawable) SpriteParameters {
 	params.drawEndY = params.spriteHeight/2 + screenHeight/2 + vMoveScreen
 
 	if d.entityType == entityTypeCoin {
-		// coins don't need vertical movement or angle adjustments
-		params.drawStartY = -params.spriteHeight/2 + screenHeight/2
-		params.drawEndY = params.spriteHeight/2 + screenHeight/2
+		// adjust coin relativesize
+		relativeSize := 0.3 // reduce size by 70%
+		params.spriteHeight = int(float64(params.spriteHeight) * relativeSize)
+		params.spriteWidth = int(float64(params.spriteWidth) * relativeSize)
+
+		// move the coin to the bottom of its original position
+		params.drawEndY = params.drawEndY + params.spriteHeight/2
+		params.drawStartY = params.drawEndY - params.spriteHeight
 	}
 
 	params.drawStartX = -params.spriteWidth/2 + params.spriteScreenX
@@ -391,6 +396,7 @@ func (g *Game) calculateSpriteParameters(d Drawable) SpriteParameters {
 
 	verticalAngleOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
 
+	// apply vertical angle offset to all entities
 	params.drawStartY += verticalAngleOffset
 	params.drawEndY += verticalAngleOffset
 
