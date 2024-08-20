@@ -2,24 +2,149 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
+	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-const (
-	minimapScale int = 8
-)
+func (g *Game) Draw(screen *ebiten.Image) {
+	if g.gameOver {
+		g.drawGameOver(screen)
+		return
+	}
+
+	// reset zbuffer
+	for i := range g.zBuffer {
+		g.zBuffer[i] = math.Inf(1)
+	}
+
+	// draw floor and ceiling
+	floorColor := color.RGBA{30, 30, 30, 255}
+	ceilingColor := color.RGBA{160, 227, 254, 255}
+	horizon := screenHeight/2 + int(float64(screenHeight)*math.Tan(g.player.verticalAngle))
+	for y := 0; y < screenHeight; y++ {
+		if y < horizon {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
+		} else {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
+		}
+	}
+
+	var drawables []Drawable // all drawable entities
+
+	// collect walls and constructs
+	for x := 0; x < screenWidth; x++ {
+		rayDirX, rayDirY := g.calculateRayDirection(x)
+		entities := g.castRay(x, rayDirX, rayDirY)
+		for _, entity := range entities {
+			drawables = append(drawables, Drawable{
+				entityType: entityTypeWallOrConstruct,
+				x:          x,
+				dist:       entity.dist,
+				entity:     entity.entity,
+				side:       entity.side,
+			})
+		}
+	}
+
+	// collect enemies
+	drawables = g.collectEnemies(drawables)
+
+	// collect coins
+	drawables = g.collectCoins(drawables)
+
+	// sort drawables by distance (furthest first)
+	sort.Slice(drawables, func(i, j int) bool {
+		return drawables[i].dist > drawables[j].dist
+	})
+
+	// draw all entities in order
+	for _, d := range drawables {
+		switch d.entityType {
+		case entityTypeWallOrConstruct:
+			g.drawWallOrConstruct(screen, d.x, d.dist, d.entity, d.side)
+		case entityTypeEnemy:
+			g.drawEnemy(screen, d)
+		case entityTypeCoin:
+			g.drawCoin(screen, d)
+		}
+	}
+
+	g.drawDynamicMinimap(screen)
+	g.drawUI(screen)
+}
+
+func (g *Game) collectEnemies(drawables []Drawable) []Drawable {
+	for i := range g.enemies {
+		enemy := &g.enemies[i]
+		spriteX := enemy.x - g.player.x
+		spriteY := enemy.y - g.player.y
+		inverseDeterminant := g.calculateSpriteInverseDeterminant()
+		transformX, transformY := g.calculateSpriteTransform(inverseDeterminant, spriteX, spriteY)
+		spriteScreenX := calculateSpriteScreenX(transformX, transformY)
+
+		drawables = append(drawables, Drawable{
+			entityType:    entityTypeEnemy,
+			x:             spriteScreenX,
+			dist:          transformY,
+			enemy:         enemy,
+			spriteScreenX: spriteScreenX,
+			transformY:    transformY,
+		})
+	}
+	return drawables
+}
+
+func (g *Game) collectCoins(drawables []Drawable) []Drawable {
+	for i := range coins {
+		coin := &coins[i]
+		spriteX := coin.x - g.player.x
+		spriteY := coin.y - g.player.y
+		inverseDeterminant := g.calculateSpriteInverseDeterminant()
+		transformX, transformY := g.calculateSpriteTransform(inverseDeterminant, spriteX, spriteY)
+		spriteScreenX := calculateSpriteScreenX(transformX, transformY)
+
+		drawables = append(drawables, Drawable{
+			entityType:    entityTypeCoin,
+			x:             spriteScreenX,
+			dist:          transformY,
+			coin:          coin,
+			spriteScreenX: spriteScreenX,
+			transformY:    transformY,
+		})
+	}
+	return drawables
+}
+
+func calculateSpriteScreenX(transformX float64, transformY float64) int {
+	spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
+	return spriteScreenX
+}
+
+func (g *Game) calculateSpriteTransform(invDet float64, spriteX float64, spriteY float64) (float64, float64) {
+	transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
+	transformY := invDet * (-g.player.planeY*spriteX + g.player.planeX*spriteY)
+	return transformX, transformY
+}
+
+func (g *Game) calculateSpriteInverseDeterminant() float64 {
+	invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
+	return invDet
+}
 
 type EntityType int
 
 const (
 	entityTypeWallOrConstruct EntityType = iota
 	entityTypeEnemy
-	entityTypeSprite
+	entityTypeCoin
 )
 
 type Drawable struct {
@@ -29,6 +154,7 @@ type Drawable struct {
 	entity        LevelEntity
 	side          int
 	enemy         *Enemy
+	coin          *Coin
 	spriteScreenX int
 	transformY    float64
 }
@@ -214,6 +340,12 @@ func (g *Game) drawEnemy(screen *ebiten.Image, d Drawable) {
 	g.drawSprite(screen, enemySprite, params, visiblePortion)
 }
 
+func (g *Game) drawCoin(screen *ebiten.Image, d Drawable) {
+	params := g.calculateSpriteParameters(d)
+	visiblePortion := getVisiblePortionOfSprite(coinSprite, params)
+	g.drawSprite(screen, coinSprite, params, visiblePortion)
+}
+
 func (g *Game) getEnemySpriteForAngle(angle float64) *ebiten.Image {
 	var spriteName string
 	if math.Abs(angle) < math.Pi/6 {
@@ -248,7 +380,7 @@ func (g *Game) calculateSpriteParameters(d Drawable) SpriteParameters {
 	params.drawStartY = -params.spriteHeight/2 + screenHeight/2 + vMoveScreen
 	params.drawEndY = params.spriteHeight/2 + screenHeight/2 + vMoveScreen
 
-	if d.entityType == entityTypeSprite {
+	if d.entityType == entityTypeCoin {
 		// Coins don't need vertical movement or angle adjustments
 		params.drawStartY = -params.spriteHeight/2 + screenHeight/2
 		params.drawEndY = params.spriteHeight/2 + screenHeight/2
@@ -305,4 +437,16 @@ func (g *Game) drawSprite(screen *ebiten.Image, enemySprite *ebiten.Image, param
 			screen.DrawImage(subImg, op)
 		}
 	}
+}
+
+func loadImageAsset(name string) *ebiten.Image {
+	readable, err := assets.Open(fmt.Sprintf("assets/%s", name))
+	if err != nil {
+		log.Fatal(err)
+	}
+	img, _, err := ebitenutil.NewImageFromReader(readable)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return img
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+const minimapScale int = 8
+
 func (g *Game) generateStaticMinimap() {
 	g.minimap = ebiten.NewImage(g.level.width()*minimapScale, g.level.height()*minimapScale)
 	for y := 0; y < g.level.height(); y++ {
@@ -181,3 +183,25 @@ func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
 }
 
 var emptySubImage = ebiten.NewImage(3, 3).SubImage(image.Rect(1, 1, 2, 2)).(*ebiten.Image)
+
+func (g *Game) updateDiscoveredAreas() {
+	const discoveryRadius float64 = 5.0 // changes the discovery radius
+	const fadeRadius float64 = 2.0      // changes the fade effect radius
+	playerX, playerY := int(g.player.x), int(g.player.y)
+
+	for y := playerY - int(discoveryRadius) - int(fadeRadius); y <= playerY+int(discoveryRadius)+int(fadeRadius); y++ {
+		for x := playerX - int(discoveryRadius) - int(fadeRadius); x <= playerX+int(discoveryRadius)+int(fadeRadius); x++ {
+			if x >= 0 && x < g.level.width() && y >= 0 && y < g.level.height() {
+				dx, dy := float64(x-playerX), float64(y-playerY)
+				distance := math.Sqrt(dx*dx + dy*dy)
+
+				if distance <= discoveryRadius {
+					g.discoveredAreas[y][x] = 1.0
+				} else if distance <= discoveryRadius+fadeRadius {
+					fade := 1.0 - (distance-discoveryRadius)/fadeRadius
+					g.discoveredAreas[y][x] = math.Max(g.discoveredAreas[y][x], fade)
+				}
+			}
+		}
+	}
+}

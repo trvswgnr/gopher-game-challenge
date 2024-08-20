@@ -90,3 +90,91 @@ func loadEnemySprites() map[string]*ebiten.Image {
 
 	return enemySprites
 }
+
+func (g *Game) updateEnemy(e *Enemy) {
+	// move towards the current patrol point
+	targetX, targetY := e.patrolPoints[e.currentPoint].x, e.patrolPoints[e.currentPoint].y
+	dx, dy := targetX-e.x, targetY-e.y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	if dist < e.speed {
+		// reached the current patrol point, move to the next one
+		e.currentPoint = (e.currentPoint + 1) % len(e.patrolPoints)
+	} else {
+		// move towards the current patrol point
+		e.x += (dx / dist) * e.speed
+		e.y += (dy / dist) * e.speed
+	}
+
+	// update direction
+	e.dirX, e.dirY = dx/dist, dy/dist
+}
+
+func (g *Game) isPlayerDetectedByEnemy() bool {
+	for _, enemy := range g.enemies {
+		if g.canEnemySeePlayer(&enemy) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
+	// calculate angle and distance between enemy and player
+	dx := g.player.x - enemy.x
+	dy := g.player.y - enemy.y
+	distToPlayer := math.Sqrt(dx*dx + dy*dy)
+	angleToPlayer := math.Atan2(dy, dx)
+
+	// check if player is within enemy's fov and range
+	enemyAngle := math.Atan2(enemy.dirY, enemy.dirX)
+	angleDiff := math.Abs(angleToPlayer - enemyAngle)
+	if angleDiff > math.Pi {
+		angleDiff = 2*math.Pi - angleDiff
+	}
+
+	if distToPlayer <= enemy.fovDistance && angleDiff <= enemy.fovAngle/2 {
+		// check if there's a clear line of sight
+		steps := int(distToPlayer * 100) // change to adjust precision
+		lastConstructHeight := 0.0
+
+		for i := 0; i <= steps; i++ {
+			t := float64(i) / float64(steps)
+			checkX := enemy.x + t*dx
+			checkY := enemy.y + t*dy
+			checkTileX, checkTileY := int(checkX), int(checkY)
+
+			// check for out of bounds
+			if checkTileX < 0 || checkTileX >= g.level.width() || checkTileY < 0 || checkTileY >= g.level.height() {
+				return false
+			}
+
+			entity := g.level.getEntityAt(checkTileX, checkTileY)
+
+			// if we hit a wall, enemy can't see player
+			if entity == LevelEntity_Wall {
+				return false
+			}
+
+			// if we hit a construct
+			if entity == LevelEntity_Construct {
+				constructHeight := 0.5 // might change this if construct heights change
+				lastConstructHeight = constructHeight
+
+				// if this is the last step (player's position) and player is crouching
+				if i == steps && g.player.isCrouching {
+					return false // player is hidden behind the construct
+				}
+			}
+
+			// we've reached the player's position
+			if checkTileX == int(g.player.x) && checkTileY == int(g.player.y) {
+				if g.player.isCrouching && lastConstructHeight > 0 {
+					return false // player is crouching and there was a construct in the line of sight
+				}
+				return true // player can be seen
+			}
+		}
+	}
+	return false
+}
