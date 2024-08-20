@@ -14,6 +14,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -42,6 +43,9 @@ type Game struct {
 	zBuffer                []float64
 	prevMouseX, prevMouseY int
 	discoveredAreas        [][]float64
+	tokens                 []Token
+	tokenSprite            *ebiten.Image
+	availableTokens        int
 }
 
 type Direction int
@@ -105,6 +109,11 @@ func NewGame() *Game {
 	playerX, playerY := level.getPlayer()
 	player := NewPlayer(playerX, playerY)
 
+	tokenSprite, _, err := ebitenutil.NewImageFromFileSystem(assets, "assets/token.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	g := &Game{
 		player:          player,
 		minimap:         ebiten.NewImage(level.width()*minimapScale, level.height()*minimapScale),
@@ -116,6 +125,9 @@ func NewGame() *Game {
 		prevMouseX:      0,
 		prevMouseY:      0,
 		discoveredAreas: make([][]float64, level.height()),
+		tokens:          make([]Token, 0),
+		tokenSprite:     tokenSprite,
+		availableTokens: 3,
 	}
 
 	for i := range g.discoveredAreas {
@@ -295,22 +307,54 @@ func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
 }
 
 func (g *Game) updateEnemy(e *Enemy) {
-	// move towards the current patrol point
-	targetX, targetY := e.patrolPoints[e.currentPoint].x, e.patrolPoints[e.currentPoint].y
-	dx, dy := targetX-e.x, targetY-e.y
-	dist := math.Sqrt(dx*dx + dy*dy)
+	const tokenDetectionRadius = 3.0
 
-	if dist < e.speed {
-		// reached the current patrol point, move to the next one
-		e.currentPoint = (e.currentPoint + 1) % len(e.patrolPoints)
-	} else {
-		// move towards the current patrol point
-		e.x += (dx / dist) * e.speed
-		e.y += (dy / dist) * e.speed
+	// Check for nearby tokens
+	nearestToken := -1
+	nearestDist := math.Inf(1)
+
+	for i, token := range g.tokens {
+		dx := token.x - e.x
+		dy := token.y - e.y
+		dist := math.Sqrt(dx*dx + dy*dy)
+
+		if dist < tokenDetectionRadius && dist < nearestDist {
+			nearestToken = i
+			nearestDist = dist
+		}
 	}
 
-	// update direction
-	e.dirX, e.dirY = dx/dist, dy/dist
+	if nearestToken != -1 {
+		// Move towards the nearest token
+		token := g.tokens[nearestToken]
+		dx := token.x - e.x
+		dy := token.y - e.y
+		dist := math.Sqrt(dx*dx + dy*dy)
+
+		e.x += (dx / dist) * e.speed
+		e.y += (dy / dist) * e.speed
+
+		// If the enemy reaches the token, remove it
+		if dist < e.speed {
+			g.tokens = append(g.tokens[:nearestToken], g.tokens[nearestToken+1:]...)
+		}
+
+		e.dirX, e.dirY = dx/nearestDist, dy/nearestDist
+	} else {
+		// Original patrol behavior
+		targetX, targetY := e.patrolPoints[e.currentPoint].x, e.patrolPoints[e.currentPoint].y
+		dx, dy := targetX-e.x, targetY-e.y
+		dist := math.Sqrt(dx*dx + dy*dy)
+
+		if dist < e.speed {
+			e.currentPoint = (e.currentPoint + 1) % len(e.patrolPoints)
+		} else {
+			e.x += (dx / dist) * e.speed
+			e.y += (dy / dist) * e.speed
+		}
+
+		e.dirX, e.dirY = dx/dist, dy/dist
+	}
 }
 
 func (g *Game) handleInput() {
@@ -333,6 +377,10 @@ func (g *Game) handleInput() {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		g.strafePlayer(strafeSpeed)
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
+		g.dropToken()
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
@@ -751,6 +799,9 @@ func (g *Game) drawUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Status: %s", crouchStatus), 10, screenHeight-80)
 
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Player Detected: %t", isPlayerDetected), 10, screenHeight-100)
+
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Tokens: %d", g.availableTokens), 10, screenHeight-120)
+	ebitenutil.DebugPrintAt(screen, "Press E to drop a token", 10, screenHeight-140)
 }
 
 var isPlayerDetected = false
@@ -844,6 +895,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		})
 	}
 
+	for i := range g.tokens {
+		token := &g.tokens[i]
+		spriteX := token.x - g.player.x
+		spriteY := token.y - g.player.y
+		invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
+		transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
+		transformY := invDet * (-g.player.planeY*spriteX + g.player.planeX*spriteY)
+
+		spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
+
+		drawables = append(drawables, Drawable{
+			entityType:    entityTypeToken,
+			x:             spriteScreenX,
+			dist:          transformY,
+			token:         token,
+			spriteScreenX: spriteScreenX,
+			transformY:    transformY,
+		})
+	}
+
 	// sort drawables by distance (furthest first)
 	sort.Slice(drawables, func(i, j int) bool {
 		return drawables[i].dist > drawables[j].dist
@@ -856,6 +927,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.drawWallOrConstruct(screen, d.x, d.dist, d.entity, d.side)
 		case entityTypeEnemy:
 			g.drawEnemy(screen, d)
+		case entityTypeToken:
+			g.drawToken(screen, d)
 		}
 	}
 
@@ -868,6 +941,7 @@ type EntityType int
 const (
 	entityTypeWallOrConstruct EntityType = iota
 	entityTypeEnemy
+	entityTypeToken
 )
 
 type Drawable struct {
@@ -879,6 +953,7 @@ type Drawable struct {
 	enemy         *Enemy
 	spriteScreenX int
 	transformY    float64
+	token         *Token
 }
 
 func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, entity LevelEntity, side int) {
@@ -1092,3 +1167,91 @@ func (level Level) getEnemies() []Enemy {
 func (l Level) width() int                       { return len(l[0]) }
 func (l Level) height() int                      { return len(l) }
 func (l Level) getEntityAt(x, y int) LevelEntity { return l[y][x] }
+
+type Token struct {
+	x, y float64
+}
+
+func (g *Game) dropToken() {
+	if g.availableTokens > 0 {
+		// Calculate the position in front of the player
+		dropDistance := 1.0 // Distance in front of the player to drop the token
+		newToken := Token{
+			x: g.player.x + g.player.dirX*dropDistance,
+			y: g.player.y + g.player.dirY*dropDistance,
+		}
+		g.tokens = append(g.tokens, newToken)
+		g.availableTokens--
+	}
+}
+func (g *Game) drawToken(screen *ebiten.Image, d Drawable) {
+	token := d.token
+	spriteX := token.x - g.player.x
+	spriteY := token.y - g.player.y
+
+	// Calculate the inverse of the determinant
+	invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
+
+	// Transform sprite position to camera space
+	transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
+	transformY := invDet * (-g.player.planeY*spriteX + g.player.planeX*spriteY)
+
+	// Calculate the screen X coordinate of the sprite
+	spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
+
+	// Calculate sprite dimensions on screen
+	spriteHeight := int(math.Abs(float64(screenHeight) / transformY))
+	spriteWidth := spriteHeight // Maintain aspect ratio
+
+	// Calculate drawing boundaries
+	drawStartX := -spriteWidth/2 + spriteScreenX
+	drawEndX := spriteWidth/2 + spriteScreenX
+	drawStartY := -spriteHeight/2 + screenHeight/2
+	drawEndY := spriteHeight/2 + screenHeight/2
+
+	// Adjust for player's vertical look angle
+	verticalAngleOffset := int(float64(screenHeight) * math.Tan(g.player.verticalAngle))
+	drawStartY += verticalAngleOffset
+	drawEndY += verticalAngleOffset
+
+	// Calculate visible portion of sprite
+	visibleStartY := 0
+	visibleEndY := g.tokenSprite.Bounds().Dy()
+	visibleStartX := 0
+	visibleEndX := g.tokenSprite.Bounds().Dx()
+
+	// Adjust visible portions and drawing boundaries
+	if drawStartY < 0 {
+		visibleStartY = -drawStartY * g.tokenSprite.Bounds().Dy() / spriteHeight
+		drawStartY = 0
+	}
+	if drawEndY >= screenHeight {
+		visibleEndY = (screenHeight - drawStartY) * g.tokenSprite.Bounds().Dy() / spriteHeight
+		drawEndY = screenHeight - 1
+	}
+	if drawStartX < 0 {
+		visibleStartX = -drawStartX * g.tokenSprite.Bounds().Dx() / spriteWidth
+		drawStartX = 0
+	}
+	if drawEndX >= screenWidth {
+		visibleEndX = (screenWidth - drawStartX) * g.tokenSprite.Bounds().Dx() / spriteWidth
+		drawEndX = screenWidth - 1
+	}
+
+	// Only draw if the token is in front of the player and within the screen bounds
+	if transformY > 0 && drawStartX < drawEndX && drawStartY < drawEndY {
+		subImg := g.tokenSprite.SubImage(image.Rect(visibleStartX, visibleStartY, visibleEndX, visibleEndY)).(*ebiten.Image)
+
+		op := &ebiten.DrawImageOptions{}
+		scaleX := float64(drawEndX-drawStartX) / float64(visibleEndX-visibleStartX)
+		scaleY := float64(drawEndY-drawStartY) / float64(visibleEndY-visibleStartY)
+		op.GeoM.Scale(scaleX, scaleY)
+		op.GeoM.Translate(float64(drawStartX), float64(drawStartY))
+		op.Filter = ebiten.FilterLinear
+
+		// Only draw if the token is not behind a wall
+		if transformY < g.zBuffer[spriteScreenX] {
+			screen.DrawImage(subImg, op)
+		}
+	}
+}
