@@ -26,16 +26,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// draw floor and ceiling
-	floorColor := color.RGBA{30, 30, 30, 255}
-	ceilingColor := color.RGBA{160, 227, 254, 255}
-	horizon := screenHeight/2 + int(float64(screenHeight)*math.Tan(g.player.verticalAngle))
-	for y := 0; y < screenHeight; y++ {
-		if y < horizon {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
-		} else {
-			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
-		}
-	}
+	g.drawFloorAndCeiling(screen)
 
 	var drawables []Drawable // all drawable entities
 
@@ -79,6 +70,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.drawDynamicMinimap(screen)
 	g.drawUI(screen)
+}
+
+func (g *Game) drawFloorAndCeiling(screen *ebiten.Image) {
+	// rgb(194 212 210)
+	floorColor := color.RGBA{194, 212, 210, 255}
+	// rgb(208 225 229)
+	ceilingColor := color.RGBA{208, 225, 229, 255}
+	horizon := screenHeight/2 + int(float64(screenHeight)*math.Tan(g.player.verticalAngle))
+	for y := 0; y < screenHeight; y++ {
+		if y < horizon {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, ceilingColor, false)
+		} else {
+			vector.DrawFilledRect(screen, 0, float32(y), float32(screenWidth), 1, floorColor, false)
+		}
+	}
 }
 
 func (g *Game) collectEnemies(drawables []Drawable) []Drawable {
@@ -295,7 +301,7 @@ func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 	var entityColor color.RGBA
 	switch entity {
 	case LevelEntity_Wall:
-		entityColor = color.RGBA{100, 100, 100, 255}
+		entityColor = color.RGBA{154, 187, 194, 255}
 	case LevelEntity_Enemy:
 		entityColor = color.RGBA{198, 54, 54, 255}
 	case LevelEntity_Exit:
