@@ -23,7 +23,7 @@ var assets embed.FS
 const (
 	screenWidth                    int     = 1024
 	screenHeight                   int     = 768
-	playerSpeedStanding            float64 = 0.08
+	playerSpeedStanding            float64 = 0.05
 	playerSpeedCrouching           float64 = 0.01
 	playerStandingHeightOffset     float64 = 0.2
 	playerCrouchingHeightOffset    float64 = 0.6
@@ -335,7 +335,7 @@ func (g *Game) handleInput() {
 		g.strafePlayer(strafeSpeed)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyShift) {
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		g.player.speed = playerSpeedCrouching
 		g.adjustPlayerHeightOffset(playerCrouchingTransitionSpeed)
 	} else {
@@ -739,7 +739,7 @@ var emptySubImage = ebiten.NewImage(3, 3).SubImage(image.Rect(1, 1, 2, 2)).(*ebi
 
 func (g *Game) drawUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()), 10, 10)
-	ebitenutil.DebugPrintAt(screen, "move with arrow keys", 10, screenHeight-40)
+	ebitenutil.DebugPrintAt(screen, "move with WASD, look with mouse, click to crouch", 10, screenHeight-40)
 	ebitenutil.DebugPrintAt(screen, "ESC to exit", 10, screenHeight-20)
 
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("height offset: %0.2f", g.player.heightOffset), 10, screenHeight-60)
