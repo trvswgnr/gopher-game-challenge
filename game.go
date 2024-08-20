@@ -82,6 +82,9 @@ func (g *Game) Update() error {
 		g.updateEnemy(&g.enemies[i])
 	}
 
+	deltaTime := 1.0 / ebiten.ActualFPS()
+	g.updateCoins(deltaTime)
+
 	// check if player is in enemy's field of vision
 	if g.isPlayerDetectedByEnemy() {
 		g.gameOver = false // todo: set to true when not debugging
