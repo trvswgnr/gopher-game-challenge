@@ -31,13 +31,14 @@ const (
 	mouseSensitivity               float64 = 0.002
 )
 
+var enemySprites = loadEnemySprites()
+
 type Game struct {
 	player                 Player
 	enemies                []Enemy
 	minimap                *ebiten.Image
 	level                  Level
 	gameOver               bool
-	enemySprites           map[string]*ebiten.Image
 	zBuffer                []float64
 	prevMouseX, prevMouseY int
 }
@@ -103,37 +104,51 @@ func NewGame() *Game {
 	playerX, playerY := level.getPlayer()
 	player := NewPlayer(playerX, playerY)
 
+	g := &Game{
+		player:     player,
+		minimap:    ebiten.NewImage(level.width()*4, level.height()*4),
+		level:      level,
+		enemies:    make([]Enemy, 0),
+		gameOver:   false,
+		zBuffer:    make([]float64, screenWidth),
+		prevMouseX: 0,
+		prevMouseY: 0,
+	}
+
+	g.initializeEnemies()
+
+	g.generateStaticMinimap()
+
+	return g
+}
+
+func loadEnemySprites() map[string]*ebiten.Image {
 	enemySprites := make(map[string]*ebiten.Image)
 	spriteNames := []string{"front", "front-left", "front-right", "back", "back-left", "back-right"}
 
 	for _, name := range spriteNames {
-		sprite, _, err := ebitenutil.NewImageFromFile(fmt.Sprintf("assets/enemy-%s.png", name))
+		asset, err := assets.Open(fmt.Sprintf("assets/enemy-%s.png", name))
 		if err != nil {
 			log.Fatalf("failed to load enemy sprite %s: %v", name, err)
+		}
+		sprite, _, err := ebitenutil.NewImageFromReader(asset)
+		if err != nil {
+			log.Fatalf("failed to read enemy sprite %s: %v", name, err)
 		}
 		enemySprites[name] = sprite
 	}
 
-	g := &Game{
-		player:       player,
-		minimap:      ebiten.NewImage(level.width()*4, level.height()*4),
-		level:        level,
-		enemies:      make([]Enemy, 0),
-		gameOver:     false,
-		enemySprites: enemySprites,
-		zBuffer:      make([]float64, screenWidth),
-		prevMouseX:   0,
-		prevMouseY:   0,
-	}
+	return enemySprites
+}
 
-	// initialize enemies with patrol points
-	for _, enemyPos := range level.getEnemies() {
+func (g *Game) initializeEnemies() {
+	for _, enemyPos := range g.level.getEnemies() {
 		enemy := Enemy{
 			x:            enemyPos.x,
 			y:            enemyPos.y,
 			dirX:         1,
 			dirY:         0,
-			patrolPoints: generatePatrolPoints(level, enemyPos.x, enemyPos.y),
+			patrolPoints: generatePatrolPoints(g.level, enemyPos.x, enemyPos.y),
 			currentPoint: 0,
 			speed:        0.01,
 			fovAngle:     math.Pi / 3, // 60 degrees
@@ -141,19 +156,21 @@ func NewGame() *Game {
 		}
 		g.enemies = append(g.enemies, enemy)
 	}
+}
 
-	// generate static minimap
+func (g *Game) generateStaticMinimap() {
 	for y := 0; y < g.level.height(); y++ {
 		for x := 0; x < g.level.width(); x++ {
-			if g.level.getEntityAt(x, y) == LevelEntity_Wall {
+			switch g.level.getEntityAt(x, y) {
+			case LevelEntity_Wall:
 				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{50, 50, 50, 255}, false)
-			} else {
+			case LevelEntity_Construct:
+				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
+			default:
 				vector.DrawFilledRect(g.minimap, float32(x*4), float32(y*4), 4, 4, color.RGBA{140, 140, 140, 255}, false)
 			}
 		}
 	}
-
-	return g
 }
 
 func generatePatrolPoints(level Level, startX, startY float64) []PatrolPoint {
@@ -224,7 +241,7 @@ func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
 
 			// if we hit a construct
 			if entity == LevelEntity_Construct {
-				constructHeight := 0.5 // adjust this value based on your construct height
+				constructHeight := 0.5 // might change this if construct heights change
 				lastConstructHeight = constructHeight
 
 				// if this is the last step (player's position) and player is crouching
@@ -243,31 +260,6 @@ func (g *Game) canEnemySeePlayer(enemy *Enemy) bool {
 		}
 	}
 	return false
-}
-
-func (g *Game) hasLineOfSight(x1, y1, x2, y2 float64) bool {
-	dx := x2 - x1
-	dy := y2 - y1
-	distance := math.Sqrt(dx*dx + dy*dy)
-	steps := int(distance * 2) // adjust for precision
-
-	for i := 0; i <= steps; i++ {
-		t := float64(i) / float64(steps)
-		x := x1 + t*dx
-		y := y1 + t*dy
-
-		tileX, tileY := int(x), int(y)
-
-		// add boundary checks
-		if tileX < 0 || tileX >= g.level.width() || tileY < 0 || tileY >= g.level.height() {
-			return false
-		}
-
-		if g.level.getEntityAt(tileX, tileY) == LevelEntity_Wall {
-			return false
-		}
-	}
-	return true
 }
 
 func (g *Game) updateEnemy(e *Enemy) {
@@ -531,7 +523,7 @@ func (g *Game) adjustPlayerHeightOffset(delta float64) {
 	g.player.isCrouching = g.player.heightOffset == playerCrouchingHeightOffset
 }
 
-func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
+func (g *Game) getVisibleEntityColor(entity LevelEntity, side int) color.RGBA {
 	var entityColor color.RGBA
 	switch entity {
 	case LevelEntity_Wall:
@@ -562,35 +554,35 @@ func (g *Game) drawDynamicMinimap(screen *ebiten.Image) {
 	op.GeoM.Translate(float64(screenWidth-g.level.width()*4-10), 10)
 	screen.DrawImage(g.minimap, op)
 
-	// draw player
+	g.drawMinimapPlayer(screen)
+
+	g.drawMinimapEnemies(screen)
+}
+
+func (g *Game) drawMinimapPlayer(screen *ebiten.Image) {
+	// teal if crouching, green if not
+	playerColor := color.RGBA{0, 255, 255, 255}
+	if g.player.isCrouching {
+		playerColor = color.RGBA{0, 255, 0, 255}
+	}
 	vector.DrawFilledCircle(
 		screen,
 		float32(screenWidth-g.level.width()*4-10+int(g.player.x*4)),
 		float32(10+int(g.player.y*4)),
 		2,
-		color.RGBA{255, 0, 0, 255},
+		playerColor,
 		false,
 	)
+}
 
-	// draw enemies
-	for _, enemy := range g.enemies {
-		vector.DrawFilledCircle(
-			screen,
-			float32(screenWidth-g.level.width()*4-10+int(enemy.x*4)),
-			float32(10+int(enemy.y*4)),
-			2,
-			color.RGBA{0, 255, 0, 255},
-			false,
-		)
-	}
-
+func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
 	// draw enemies and their field of vision
 	for _, enemy := range g.enemies {
 		enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
 		enemyY := float32(10 + int(enemy.y*4))
 
 		// draw enemy
-		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{0, 255, 0, 255}, false)
+		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{255, 0, 0, 255}, false)
 
 		// draw field of vision
 		leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
@@ -746,7 +738,7 @@ type Drawable struct {
 
 func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, entity LevelEntity, side int) {
 	_, drawStart, drawEnd := g.calculateLineParameters(dist, entity)
-	wallColor := g.getEntityColor(entity, side)
+	wallColor := g.getVisibleEntityColor(entity, side)
 	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
 }
 
@@ -801,7 +793,7 @@ func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
 	} else {
 		spriteName = "front-right"
 	}
-	enemySprite := g.enemySprites[spriteName]
+	enemySprite := enemySprites[spriteName]
 
 	visibleStartY := 0
 	visibleEndY := enemySprite.Bounds().Dy()
