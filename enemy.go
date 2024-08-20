@@ -92,6 +92,53 @@ func loadEnemySprites() map[string]*ebiten.Image {
 }
 
 func (g *Game) updateEnemy(e *Enemy) {
+	nearestToken := g.findNearestCoin(e)
+	if nearestToken != nil && g.distanceBetween(e.x, e.y, nearestToken.x, nearestToken.y) <= coinAttractionDistance {
+		g.enemyFollowCoin(e, nearestToken)
+	} else {
+		g.enemyPatrol(e)
+	}
+}
+
+func (g *Game) findNearestCoin(e *Enemy) *Coin {
+	var nearestToken *Coin
+	nearestDist := math.Inf(1)
+
+	for i := range coins {
+		dist := g.distanceBetween(e.x, e.y, coins[i].x, coins[i].y)
+		if dist < nearestDist {
+			nearestDist = dist
+			nearestToken = &coins[i]
+		}
+	}
+
+	return nearestToken
+}
+
+func (g *Game) distanceBetween(x1, y1, x2, y2 float64) float64 {
+	dx, dy := x2-x1, y2-y1
+	return math.Sqrt(dx*dx + dy*dy)
+}
+
+func (g *Game) enemyFollowCoin(e *Enemy, nearestToken *Coin) {
+	// Calculate direction to token
+	dx, dy := nearestToken.x-e.x, nearestToken.y-e.y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	// Stop a little before the token
+	stopDistance := 0.5 // Adjust this value to change how close the enemy gets to the token
+	if dist > stopDistance {
+		// Move towards the token
+		e.x += (dx / dist) * e.speed
+		e.y += (dy / dist) * e.speed
+
+		// Update direction (facing) only while moving
+		e.dirX, e.dirY = dx/dist, dy/dist
+	}
+	// If within stopDistance, the enemy stops moving and keeps its current direction
+}
+
+func (g *Game) enemyPatrol(e *Enemy) {
 	// move towards the current patrol point
 	targetX, targetY := e.patrolPoints[e.currentPoint].x, e.patrolPoints[e.currentPoint].y
 	dx, dy := targetX-e.x, targetY-e.y
