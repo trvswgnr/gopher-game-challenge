@@ -404,7 +404,7 @@ func (g *Game) calculateSpriteParameters(d Drawable) SpriteParameters {
 	params.drawEndY = params.spriteHeight/2 + screenHeight/2 + vMoveScreen
 
 	if d.entityType == entityTypeCoin {
-		// Coins don't need vertical movement or angle adjustments
+		// coins don't need vertical movement or angle adjustments
 		params.drawStartY = -params.spriteHeight/2 + screenHeight/2
 		params.drawEndY = params.spriteHeight/2 + screenHeight/2
 	}
