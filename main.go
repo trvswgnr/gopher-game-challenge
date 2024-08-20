@@ -576,26 +576,44 @@ func (g *Game) drawMinimapPlayer(screen *ebiten.Image) {
 }
 
 func (g *Game) drawMinimapEnemies(screen *ebiten.Image) {
-	// draw enemies and their field of vision
-	for _, enemy := range g.enemies {
-		enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(enemy.x*4))
-		enemyY := float32(10 + int(enemy.y*4))
-
-		// draw enemy
-		vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{255, 0, 0, 255}, false)
-
-		// draw field of vision
-		leftAngle := math.Atan2(enemy.dirY, enemy.dirX) - enemy.fovAngle/2
-		rightAngle := math.Atan2(enemy.dirY, enemy.dirX) + enemy.fovAngle/2
-
-		leftX := enemyX + float32(math.Cos(leftAngle)*enemy.fovDistance*4)
-		leftY := enemyY + float32(math.Sin(leftAngle)*enemy.fovDistance*4)
-		rightX := enemyX + float32(math.Cos(rightAngle)*enemy.fovDistance*4)
-		rightY := enemyY + float32(math.Sin(rightAngle)*enemy.fovDistance*4)
-
-		vector.StrokeLine(screen, enemyX, enemyY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
-		vector.StrokeLine(screen, enemyX, enemyY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
+	if len(g.enemies) == 0 {
+		return
 	}
+
+	// find the closest enemy
+	closestEnemy := &g.enemies[0]
+	closestDistSquared := math.Inf(1)
+
+	for i := range g.enemies {
+		enemy := &g.enemies[i]
+		dx := enemy.x - g.player.x
+		dy := enemy.y - g.player.y
+		distSquared := dx*dx + dy*dy
+
+		if distSquared < closestDistSquared {
+			closestDistSquared = distSquared
+			closestEnemy = enemy
+		}
+	}
+
+	// draw only the closest enemy and its field of vision
+	enemyX := float32(screenWidth - g.level.width()*4 - 10 + int(closestEnemy.x*4))
+	enemyY := float32(10 + int(closestEnemy.y*4))
+
+	// draw enemy
+	vector.DrawFilledCircle(screen, enemyX, enemyY, 2, color.RGBA{255, 0, 0, 255}, false)
+
+	// draw field of vision
+	leftAngle := math.Atan2(closestEnemy.dirY, closestEnemy.dirX) - closestEnemy.fovAngle/2
+	rightAngle := math.Atan2(closestEnemy.dirY, closestEnemy.dirX) + closestEnemy.fovAngle/2
+
+	leftX := enemyX + float32(math.Cos(leftAngle)*closestEnemy.fovDistance*4)
+	leftY := enemyY + float32(math.Sin(leftAngle)*closestEnemy.fovDistance*4)
+	rightX := enemyX + float32(math.Cos(rightAngle)*closestEnemy.fovDistance*4)
+	rightY := enemyY + float32(math.Sin(rightAngle)*closestEnemy.fovDistance*4)
+
+	vector.StrokeLine(screen, enemyX, enemyY, leftX, leftY, 1, color.RGBA{255, 255, 0, 128}, false)
+	vector.StrokeLine(screen, enemyX, enemyY, rightX, rightY, 1, color.RGBA{255, 255, 0, 128}, false)
 }
 
 func (g *Game) drawUI(screen *ebiten.Image) {
@@ -684,7 +702,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// collect enemies
-	for _, enemy := range g.enemies {
+	for i := range g.enemies {
+		enemy := &g.enemies[i]
 		spriteX := enemy.x - g.player.x
 		spriteY := enemy.y - g.player.y
 		invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
@@ -694,10 +713,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
 
 		drawables = append(drawables, Drawable{
-			entityType: entityTypeEnemy,
-			x:          spriteScreenX,
-			dist:       transformY,
-			enemy:      &enemy,
+			entityType:    entityTypeEnemy,
+			x:             spriteScreenX,
+			dist:          transformY,
+			enemy:         enemy,
+			spriteScreenX: spriteScreenX,
+			transformY:    transformY,
 		})
 	}
 
@@ -712,7 +733,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		case entityTypeWallOrConstruct:
 			g.drawWallOrConstruct(screen, d.x, d.dist, d.entity, d.side)
 		case entityTypeEnemy:
-			g.drawEnemy(screen, d.enemy, d.dist)
+			g.drawEnemy(screen, d)
 		}
 	}
 
@@ -728,12 +749,14 @@ const (
 )
 
 type Drawable struct {
-	entityType EntityType
-	x          int
-	dist       float64
-	entity     LevelEntity
-	side       int
-	enemy      *Enemy
+	entityType    EntityType
+	x             int
+	dist          float64
+	entity        LevelEntity
+	side          int
+	enemy         *Enemy
+	spriteScreenX int
+	transformY    float64
 }
 
 func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, entity LevelEntity, side int) {
@@ -742,18 +765,10 @@ func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, en
 	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
 }
 
-func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
-	// calculate sprite position relative to camera
-	spriteX := enemy.x - g.player.x
-	spriteY := enemy.y - g.player.y
-
-	// calculate transformation matrix
-	invDet := 1.0 / (g.player.planeX*g.player.dirY - g.player.dirX*g.player.planeY)
-	transformX := invDet * (g.player.dirY*spriteX - g.player.dirX*spriteY)
-	transformY := dist
-
-	// calculate sprite screen position
-	spriteScreenX := int((float64(screenWidth) / 2) * (1 + transformX/transformY))
+func (g *Game) drawEnemy(screen *ebiten.Image, d Drawable) {
+	enemy := d.enemy
+	spriteScreenX := d.spriteScreenX
+	transformY := d.transformY
 
 	// calculate sprite dimensions on screen
 	spriteHeight := int(math.Abs(float64(screenHeight) / transformY))
