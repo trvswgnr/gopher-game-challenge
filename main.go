@@ -31,14 +31,13 @@ const (
 	mouseSensitivity               float64 = 0.002
 )
 
-var enemySprites = loadEnemySprites()
-
 type Game struct {
 	player                 Player
 	enemies                []Enemy
 	minimap                *ebiten.Image
 	level                  Level
 	gameOver               bool
+	enemySprites           map[string]*ebiten.Image
 	zBuffer                []float64
 	prevMouseX, prevMouseY int
 }
@@ -105,14 +104,15 @@ func NewGame() *Game {
 	player := NewPlayer(playerX, playerY)
 
 	g := &Game{
-		player:     player,
-		minimap:    ebiten.NewImage(level.width()*4, level.height()*4),
-		level:      level,
-		enemies:    make([]Enemy, 0),
-		gameOver:   false,
-		zBuffer:    make([]float64, screenWidth),
-		prevMouseX: 0,
-		prevMouseY: 0,
+		player:       player,
+		minimap:      ebiten.NewImage(level.width()*4, level.height()*4),
+		level:        level,
+		enemies:      make([]Enemy, 0),
+		gameOver:     false,
+		enemySprites: loadEnemySprites(),
+		zBuffer:      make([]float64, screenWidth),
+		prevMouseX:   0,
+		prevMouseY:   0,
 	}
 
 	g.initializeEnemies()
@@ -523,7 +523,7 @@ func (g *Game) adjustPlayerHeightOffset(delta float64) {
 	g.player.isCrouching = g.player.heightOffset == playerCrouchingHeightOffset
 }
 
-func (g *Game) getVisibleEntityColor(entity LevelEntity, side int) color.RGBA {
+func (g *Game) getEntityColor(entity LevelEntity, side int) color.RGBA {
 	var entityColor color.RGBA
 	switch entity {
 	case LevelEntity_Wall:
@@ -738,7 +738,7 @@ type Drawable struct {
 
 func (g *Game) drawWallOrConstruct(screen *ebiten.Image, x int, dist float64, entity LevelEntity, side int) {
 	_, drawStart, drawEnd := g.calculateLineParameters(dist, entity)
-	wallColor := g.getVisibleEntityColor(entity, side)
+	wallColor := g.getEntityColor(entity, side)
 	vector.DrawFilledRect(screen, float32(x), float32(drawStart), 1, float32(drawEnd-drawStart), wallColor, false)
 }
 
@@ -793,7 +793,7 @@ func (g *Game) drawEnemy(screen *ebiten.Image, enemy *Enemy, dist float64) {
 	} else {
 		spriteName = "front-right"
 	}
-	enemySprite := enemySprites[spriteName]
+	enemySprite := g.enemySprites[spriteName]
 
 	visibleStartY := 0
 	visibleEndY := enemySprite.Bounds().Dy()
