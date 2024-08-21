@@ -47,10 +47,10 @@ func (g *Game) movePlayer(forwardSpeed, strafeSpeed float64) {
 	nextX := g.player.x + g.player.dirX*forwardSpeed + g.player.planeX*strafeSpeed
 	nextY := g.player.y + g.player.dirY*forwardSpeed + g.player.planeY*strafeSpeed
 
-	if !g.playerCollision(nextX, g.player.y) {
+	if !g.checkCollision(nextX, g.player.y) {
 		g.player.x = nextX
 	}
-	if !g.playerCollision(g.player.x, nextY) {
+	if !g.checkCollision(g.player.x, nextY) {
 		g.player.y = nextY
 	}
 }
@@ -103,30 +103,4 @@ func (g *Game) adjustPlayerHeightOffset(delta float64) {
 		g.player.heightOffset = playerStandingHeightOffset
 	}
 	g.player.isCrouching = g.player.heightOffset == playerCrouchingHeightOffset
-}
-
-func (g *Game) playerCollision(x, y float64) bool {
-	// check position is within level bounds
-	if x < 0 || y < 0 || int(x) >= g.level.width() || int(y) >= g.level.height() {
-		return true
-	}
-
-	// check position is wall or construct
-	entity := g.level.getEntityAt(int(x), int(y))
-	if entity == LevelEntity_Wall || entity == LevelEntity_Construct {
-		return true
-	}
-
-	// check enemy collision
-	for _, enemy := range g.enemies {
-		dx := x - enemy.x
-		dy := y - enemy.y
-		distSquared := dx*dx + dy*dy
-		if distSquared < 0.25 { // collision radius of 0.5
-			g.gameOver = true // running into an enemy probably alerts them lol
-			return true
-		}
-	}
-
-	return false
 }

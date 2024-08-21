@@ -137,6 +137,32 @@ func (g *Game) handleInput() {
 	}
 }
 
+func (g *Game) checkCollision(x, y float64) bool {
+	// check position is within level bounds
+	if x < 0 || y < 0 || int(x) >= g.level.width() || int(y) >= g.level.height() {
+		return true
+	}
+
+	// check position is wall or construct
+	entity := g.level.getEntityAt(int(x), int(y))
+	if entity == LevelEntity_Wall || entity == LevelEntity_Construct {
+		return true
+	}
+
+	// check enemy collision
+	for _, enemy := range g.enemies {
+		dx := x - enemy.x
+		dy := y - enemy.y
+		distSquared := dx*dx + dy*dy
+		if distSquared < 0.25 { // collision radius of 0.5
+			g.gameOver = true // running into an enemy probably alerts them lol
+			return true
+		}
+	}
+
+	return false
+}
+
 func (g *Game) drawGameOver(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "GAME OVER", screenWidth/2-40, screenHeight/2-10)
 	ebitenutil.DebugPrintAt(screen, "Press SPACE to restart", screenWidth/2-80, screenHeight/2+10)

@@ -8,6 +8,7 @@ import (
 const (
 	coinAttractionDistance = 5.0
 	coinLifespan           = 6.0
+	coinDropDistance       = 2.0
 )
 
 var (
@@ -26,11 +27,16 @@ func loadCoinSprite() *ebiten.Image {
 }
 
 func (g *Game) dropCoin() {
-	if playerCoinCoint > 0 {
-		// Calculate position in front of the player
-		coinX := g.player.x + g.player.dirX
-		coinY := g.player.y + g.player.dirY
+	if playerCoinCoint <= 0 {
+		return
+	}
 
+	// calculate position in front of the player
+	coinX := g.player.x + g.player.dirX*coinDropDistance
+	coinY := g.player.y + g.player.dirY*coinDropDistance
+
+	// check if calculated position is valid (not inside a wall)
+	if !g.checkCollision(coinX, coinY) {
 		coins = append(coins, Coin{x: coinX, y: coinY, lifespan: coinLifespan})
 		playerCoinCoint--
 	}
