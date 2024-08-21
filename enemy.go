@@ -92,15 +92,6 @@ func loadEnemySprites() map[string]*ebiten.Image {
 	return enemySprites
 }
 
-func (g *Game) updateEnemy(e *Enemy) {
-	nearestToken := g.findNearestCoin(e)
-	if nearestToken != nil && g.distanceBetween(e.x, e.y, nearestToken.x, nearestToken.y) <= coinAttractionDistance {
-		g.enemyFollowCoin(e, nearestToken)
-	} else {
-		g.enemyPatrol(e)
-	}
-}
-
 func (g *Game) findNearestCoin(e *Enemy) *Coin {
 	var nearestToken *Coin
 	nearestDist := math.Inf(1)
@@ -119,6 +110,15 @@ func (g *Game) findNearestCoin(e *Enemy) *Coin {
 func (g *Game) distanceBetween(x1, y1, x2, y2 float64) float64 {
 	dx, dy := x2-x1, y2-y1
 	return math.Sqrt(dx*dx + dy*dy)
+}
+
+func (g *Game) updateEnemy(e *Enemy) {
+	nearestToken := g.findNearestCoin(e)
+	if nearestToken != nil && g.distanceBetween(e.x, e.y, nearestToken.x, nearestToken.y) <= coinAttractionDistance {
+		g.enemyFollowCoin(e, nearestToken)
+	} else {
+		g.enemyPatrol(e)
+	}
 }
 
 func (g *Game) enemyFollowCoin(e *Enemy, nearestToken *Coin) {
