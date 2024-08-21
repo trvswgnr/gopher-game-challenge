@@ -1,5 +1,4 @@
 // game.go
-
 package main
 
 import (
