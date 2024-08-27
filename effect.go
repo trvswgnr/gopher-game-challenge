@@ -1,4 +1,4 @@
-package model
+package main
 
 import (
 	"image/color"
@@ -8,21 +8,21 @@ import (
 )
 
 type Effect struct {
-	*Sprite
+	*SpriteInstance
 	LoopCount int
 }
 
-func NewAnimatedEffect(
+func NewEffect(
 	x, y, scale float64, animationRate int, img *ebiten.Image, columns, rows int, anchor raycaster.SpriteAnchor, loopCount int,
 ) *Effect {
 	mapColor := color.RGBA{0, 0, 0, 0}
 	e := &Effect{
-		Sprite:    NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, 0, 0),
-		LoopCount: loopCount,
+		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, 0, 0),
+		LoopCount:      loopCount,
 	}
 
 	// effects should not be convergence capable by player focal point
-	e.Sprite.Focusable = false
+	e.SpriteInstance.Focusable = false
 
 	// effects self illuminate so they do not get dimmed in dark conditions
 	e.illumination = 5000

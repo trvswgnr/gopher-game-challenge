@@ -1,7 +1,6 @@
 package main
 
 import (
-	"game/model"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -10,7 +9,7 @@ import (
 )
 
 type Crosshairs struct {
-	*model.Sprite
+	*SpriteInstance
 	hitTimer     int
 	HitIndicator *Crosshairs
 }
@@ -20,12 +19,12 @@ func NewCrosshairs(
 ) *Crosshairs {
 	mapColor := color.RGBA{0, 0, 0, 0}
 	c := &Crosshairs{
-		Sprite: model.NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, raycaster.AnchorCenter, 0, 0),
+		SpriteInstance: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, raycaster.AnchorCenter, 0, 0),
 	}
 
 	hitIndicator := &Crosshairs{}
 	copier.Copy(hitIndicator, c)
-	hitIndicator.Sprite.SetAnimationFrame(hitIndex)
+	hitIndicator.SpriteInstance.SetAnimationFrame(hitIndex)
 	c.HitIndicator = hitIndicator
 
 	return c

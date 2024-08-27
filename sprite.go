@@ -1,4 +1,4 @@
-package model
+package main
 
 import (
 	"image"
@@ -14,7 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-type Sprite struct {
+type SpriteInstance struct {
 	*Entity
 	W, H           int
 	AnimationRate  int
@@ -32,39 +32,39 @@ type Sprite struct {
 	screenRect     *image.Rectangle
 }
 
-func (s *Sprite) Scale() float64 {
+func (s *SpriteInstance) Scale() float64 {
 	return s.Entity.Scale
 }
 
-func (s *Sprite) VerticalAnchor() raycaster.SpriteAnchor {
+func (s *SpriteInstance) VerticalAnchor() raycaster.SpriteAnchor {
 	return s.Entity.Anchor
 }
 
-func (s *Sprite) Texture() *ebiten.Image {
+func (s *SpriteInstance) Texture() *ebiten.Image {
 	return s.textures[s.texNum]
 }
 
-func (s *Sprite) TextureRect() image.Rectangle {
+func (s *SpriteInstance) TextureRect() image.Rectangle {
 	return s.texRects[s.texNum]
 }
 
-func (s *Sprite) Illumination() float64 {
+func (s *SpriteInstance) Illumination() float64 {
 	return s.illumination
 }
 
-func (s *Sprite) SetScreenRect(rect *image.Rectangle) {
+func (s *SpriteInstance) SetScreenRect(rect *image.Rectangle) {
 	s.screenRect = rect
 }
 
-func (s *Sprite) IsFocusable() bool {
+func (s *SpriteInstance) IsFocusable() bool {
 	return s.Focusable
 }
 
 func NewSprite(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
 	anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
-) *Sprite {
-	s := &Sprite{
+) *SpriteInstance {
+	s := &SpriteInstance{
 		Entity: &Entity{
 			Position:        &geom.Vector2{X: x, Y: y},
 			PositionZ:       0,
@@ -94,8 +94,8 @@ func NewSprite(
 func NewSpriteFromSheet(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
 	columns, rows, spriteIndex int, anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
-) *Sprite {
-	s := &Sprite{
+) *SpriteInstance {
+	s := &SpriteInstance{
 		Entity: &Entity{
 			Position:        &geom.Vector2{X: x, Y: y},
 			PositionZ:       0,
@@ -141,8 +141,8 @@ func NewSpriteFromSheet(
 func NewAnimatedSprite(
 	x, y, scale float64, animationRate int, img *ebiten.Image, mapColor color.RGBA,
 	columns, rows int, anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
-) *Sprite {
-	s := &Sprite{
+) *SpriteInstance {
+	s := &SpriteInstance{
 		Entity: &Entity{
 			Position:        &geom.Vector2{X: x, Y: y},
 			PositionZ:       0,
@@ -189,7 +189,7 @@ func NewAnimatedSprite(
 	return s
 }
 
-func (s *Sprite) SetTextureFacingMap(texFacingMap map[float64]int) {
+func (s *SpriteInstance) SetTextureFacingMap(texFacingMap map[float64]int) {
 	s.texFacingMap = texFacingMap
 
 	// create pre-sorted list of keys used during facing determination
@@ -200,7 +200,7 @@ func (s *Sprite) SetTextureFacingMap(texFacingMap map[float64]int) {
 	sort.Float64s(s.texFacingKeys)
 }
 
-func (s *Sprite) getTextureFacingKeyForAngle(facingAngle float64) float64 {
+func (s *SpriteInstance) getTextureFacingKeyForAngle(facingAngle float64) float64 {
 	var closestKeyAngle float64 = -1
 	if s.texFacingMap == nil || len(s.texFacingMap) == 0 || s.texFacingKeys == nil || len(s.texFacingKeys) == 0 {
 		return closestKeyAngle
@@ -218,29 +218,29 @@ func (s *Sprite) getTextureFacingKeyForAngle(facingAngle float64) float64 {
 	return closestKeyAngle
 }
 
-func (s *Sprite) SetAnimationReversed(isReverse bool) {
+func (s *SpriteInstance) SetAnimationReversed(isReverse bool) {
 	s.animReversed = isReverse
 }
 
-func (s *Sprite) SetAnimationFrame(texNum int) {
+func (s *SpriteInstance) SetAnimationFrame(texNum int) {
 	s.texNum = texNum
 }
 
-func (s *Sprite) ResetAnimation() {
+func (s *SpriteInstance) ResetAnimation() {
 	s.animCounter = 0
 	s.loopCounter = 0
 	s.texNum = 0
 }
 
-func (s *Sprite) LoopCounter() int {
+func (s *SpriteInstance) LoopCounter() int {
 	return s.loopCounter
 }
 
-func (s *Sprite) ScreenRect() *image.Rectangle {
+func (s *SpriteInstance) ScreenRect() *image.Rectangle {
 	return s.screenRect
 }
 
-func (s *Sprite) Update(camPos *geom.Vector2) {
+func (s *SpriteInstance) Update(camPos *geom.Vector2) {
 	if s.AnimationRate <= 0 {
 		return
 	}
@@ -292,7 +292,7 @@ func (s *Sprite) Update(camPos *geom.Vector2) {
 	}
 }
 
-func (s *Sprite) AddDebugLines(lineWidth int, clr color.Color) {
+func (s *SpriteInstance) AddDebugLines(lineWidth int, clr color.Color) {
 	lW := float64(lineWidth)
 	sW := float64(s.W)
 	sH := float64(s.H)

@@ -4,8 +4,6 @@ import (
 	"image"
 	"image/color"
 	"sort"
-
-	"game/model"
 )
 
 func (g *Game) miniMap() *image.RGBA {
@@ -24,7 +22,7 @@ func (g *Game) miniMap() *image.RGBA {
 	}
 
 	// sprite positions, sort by color to avoid random color getting chosen as last when using map keys
-	sprites := make([]*model.Entity, 0, len(g.sprites))
+	sprites := make([]*Entity, 0, len(g.sprites))
 	for s := range g.sprites {
 		sprites = append(sprites, s.Entity)
 	}
@@ -42,7 +40,7 @@ func (g *Game) miniMap() *image.RGBA {
 	}
 
 	// projectile positions
-	projectiles := make([]*model.Entity, 0, len(g.projectiles))
+	projectiles := make([]*Entity, 0, len(g.projectiles))
 	for p := range g.projectiles {
 		projectiles = append(projectiles, p.Entity)
 	}

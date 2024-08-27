@@ -62,11 +62,11 @@ func (g *Game) handleInput() {
 		g.mouseX, g.mouseY = x, y
 
 		if dx != 0 {
-			g.Rotate(0.005 * float64(dx) * moveModifier)
+			g.player.rotate(0.005 * float64(dx) * moveModifier)
 		}
 
 		if dy != 0 {
-			g.player.SetPitch(0.005 * float64(dy))
+			g.player.updatePitch(0.005 * float64(dy))
 		}
 	}
 
@@ -100,25 +100,25 @@ func (g *Game) handleInput() {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyC) {
-		g.player.Crouch()
+		g.player.crouch()
 	} else if ebiten.IsKeyPressed(ebiten.KeyZ) {
-		g.player.Prone()
+		g.player.goProne()
 	} else if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.player.Jump()
 	} else {
 		// Apply gravity when space is not pressed
-		g.player.ApplyGravity()
+		g.player.applyGravity()
 	}
 
 	if forward {
-		g.Move(0.06 * moveModifier)
+		g.move(0.06 * moveModifier)
 	} else if backward {
-		g.Move(-0.06 * moveModifier)
+		g.move(-0.06 * moveModifier)
 	}
 
 	if strafeLeft {
-		g.Strafe(-0.05 * moveModifier)
+		g.strafe(-0.05 * moveModifier)
 	} else if strafeRight {
-		g.Strafe(0.05 * moveModifier)
+		g.strafe(0.05 * moveModifier)
 	}
 }

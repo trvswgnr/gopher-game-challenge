@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"game/model"
 	"log"
 	"math"
 	"math/rand"
@@ -52,7 +51,7 @@ type Game struct {
 	width  int
 	height int
 
-	player *model.Player
+	player *Player
 
 	//--define camera and render scene--//
 	camera *raycaster.Camera
@@ -74,12 +73,12 @@ type Game struct {
 	maxLightRGB        *color.NRGBA
 
 	//--array of levels, levels refer to "floors" of the world--//
-	mapObj       *model.Map
+	mapObj       *Map
 	collisionMap []geom.Line
 
-	sprites     map[*model.Sprite]struct{}
-	projectiles map[*model.Projectile]struct{}
-	effects     map[*model.Effect]struct{}
+	sprites     map[*SpriteInstance]struct{}
+	projectiles map[*Projectile]struct{}
+	effects     map[*Effect]struct{}
 
 	mapWidth, mapHeight int
 
@@ -126,7 +125,7 @@ func NewGame() *Game {
 	g.setVsyncEnabled(g.vsync)
 
 	// load map
-	g.mapObj = model.NewMap()
+	g.mapObj = NewMap()
 
 	// load texture handler
 	g.tex = NewTextureHandler(g.mapObj, 32)
@@ -145,7 +144,7 @@ func NewGame() *Game {
 
 	// init player model
 	angleDegrees := 60.0
-	g.player = model.NewPlayer(8.5, 3.5, geom.Radians(angleDegrees), 0)
+	g.player = NewPlayer(8.5, 3.5, geom.Radians(angleDegrees), 0)
 	g.player.CollisionRadius = clipDistance
 	g.player.CollisionHeight = 0.5
 
@@ -230,11 +229,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		index += 1
 	}
 	for projectile := range g.projectiles {
-		raycastSprites[index] = projectile.Sprite
+		raycastSprites[index] = projectile.SpriteInstance
 		index += 1
 	}
 	for effect := range g.effects {
-		raycastSprites[index] = effect.Sprite
+		raycastSprites[index] = effect.SpriteInstance
 		index += 1
 	}
 
@@ -282,11 +281,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 
 		for sprite := range g.projectiles {
-			drawSpriteBox(g.scene, sprite.Sprite)
+			drawSpriteBox(g.scene, sprite.SpriteInstance)
 		}
 
 		for sprite := range g.effects {
-			drawSpriteBox(g.scene, sprite.Sprite)
+			drawSpriteBox(g.scene, sprite.SpriteInstance)
 		}
 	}
 
@@ -357,7 +356,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fps)
 }
 
-func drawSpriteBox(screen *ebiten.Image, sprite *model.Sprite) {
+func drawSpriteBox(screen *ebiten.Image, sprite *SpriteInstance) {
 	r := sprite.ScreenRect()
 	if r == nil {
 		return
@@ -369,7 +368,7 @@ func drawSpriteBox(screen *ebiten.Image, sprite *model.Sprite) {
 	vector.StrokeRect(screen, minX, minY, maxX-minX, maxY-minY, 1, color.RGBA{255, 0, 0, 255}, false)
 }
 
-func drawSpriteIndicator(screen *ebiten.Image, sprite *model.Sprite) {
+func drawSpriteIndicator(screen *ebiten.Image, sprite *SpriteInstance) {
 	r := sprite.ScreenRect()
 	if r == nil {
 		return
@@ -433,46 +432,6 @@ func (g *Game) setVsyncEnabled(enableVsync bool) {
 func (g *Game) setFovAngle(fovDegrees float64) {
 	g.fovDegrees = fovDegrees
 	g.camera.SetFovAngle(fovDegrees, 1.0)
-}
-
-// Move player by move speed in the forward/backward direction
-func (g *Game) Move(mSpeed float64) {
-	moveLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle, mSpeed)
-
-	newPos, _, _ := g.getValidMove(g.player.Entity, moveLine.X2, moveLine.Y2, g.player.PositionZ, true)
-	if !newPos.Equals(g.player.Pos()) {
-		g.player.Position = newPos
-		g.player.Moved = true
-	}
-}
-
-// Move player by strafe speed in the left/right direction
-func (g *Game) Strafe(sSpeed float64) {
-	strafeAngle := geom.HalfPi
-	if sSpeed < 0 {
-		strafeAngle = -strafeAngle
-	}
-	strafeLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle-strafeAngle, math.Abs(sSpeed))
-
-	newPos, _, _ := g.getValidMove(g.player.Entity, strafeLine.X2, strafeLine.Y2, g.player.PositionZ, true)
-	if !newPos.Equals(g.player.Pos()) {
-		g.player.Position = newPos
-		g.player.Moved = true
-	}
-}
-
-// Rotate player heading angle by rotation speed
-func (g *Game) Rotate(rSpeed float64) {
-	g.player.Angle += rSpeed
-
-	for g.player.Angle > geom.Pi {
-		g.player.Angle = g.player.Angle - geom.Pi2
-	}
-	for g.player.Angle <= -geom.Pi {
-		g.player.Angle = g.player.Angle + geom.Pi2
-	}
-
-	g.player.Moved = true
 }
 
 func (g *Game) fireWeapon() {
@@ -543,7 +502,7 @@ func (g *Game) updateProjectiles() {
 				g.deleteProjectile(p)
 
 				// make a sprite/wall getting hit by projectile cause some visual effect
-				if p.ImpactEffect.Sprite != nil {
+				if p.ImpactEffect.SpriteInstance != nil {
 					if len(collisions) >= 1 {
 						// use the first collision point to place effect at
 						newPos = collisions[0].collision

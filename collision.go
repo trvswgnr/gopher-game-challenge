@@ -4,21 +4,19 @@ import (
 	"math"
 	"sort"
 
-	"game/model"
-
 	"github.com/harbdog/raycaster-go"
 	"github.com/harbdog/raycaster-go/geom"
 )
 
 type EntityCollision struct {
-	entity     *model.Entity
+	entity     *Entity
 	collision  *geom.Vector2
 	collisionZ float64
 }
 
 // checks for valid move from current position, returns valid (x, y) position, whether a collision
 // was encountered, and a list of entity collisions that may have been encountered
-func (g *Game) getValidMove(entity *model.Entity, moveX, moveY, moveZ float64, checkAlternate bool) (*geom.Vector2, bool, []*EntityCollision) {
+func (g *Game) getValidMove(entity *Entity, moveX, moveY, moveZ float64, checkAlternate bool) (*geom.Vector2, bool, []*EntityCollision) {
 	posX, posY, posZ := entity.Position.X, entity.Position.Y, entity.PositionZ
 	if posX == moveX && posY == moveY && posZ == moveZ {
 		return &geom.Vector2{X: posX, Y: posY}, false, []*EntityCollision{}
@@ -191,7 +189,7 @@ func (g *Game) getValidMove(entity *model.Entity, moveX, moveY, moveZ float64, c
 }
 
 // zEntityIntersection returns the best positionZ intersection point on the target from the source (-1 if no intersection)
-func zEntityIntersection(sourceZ float64, source, target *model.Entity) float64 {
+func zEntityIntersection(sourceZ float64, source, target *Entity) float64 {
 	srcMinZ, srcMaxZ := zEntityMinMax(sourceZ, source)
 	tgtMinZ, tgtMaxZ := zEntityMinMax(target.PositionZ, target)
 
@@ -209,7 +207,7 @@ func zEntityIntersection(sourceZ float64, source, target *model.Entity) float64 
 }
 
 // zEntityMinMax calculates the minZ/maxZ used for basic collision checking in the Z-plane
-func zEntityMinMax(positionZ float64, entity *model.Entity) (float64, float64) {
+func zEntityMinMax(positionZ float64, entity *Entity) (float64, float64) {
 	var minZ, maxZ float64
 	collisionHeight := entity.CollisionHeight
 

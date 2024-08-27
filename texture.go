@@ -1,20 +1,19 @@
 package main
 
 import (
-	"game/model"
 	"image"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type TextureHandler struct {
-	mapObj         *model.Map
+	mapObj         *Map
 	textures       []*ebiten.Image
 	floorTex       *image.RGBA
 	renderFloorTex bool
 }
 
-func NewTextureHandler(mapObj *model.Map, textureCapacity int) *TextureHandler {
+func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandler {
 	t := &TextureHandler{
 		mapObj:         mapObj,
 		textures:       make([]*ebiten.Image, textureCapacity),
