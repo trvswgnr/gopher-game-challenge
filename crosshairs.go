@@ -5,7 +5,6 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/harbdog/raycaster-go"
-	"github.com/jinzhu/copier"
 )
 
 type Crosshairs struct {
@@ -23,7 +22,7 @@ func NewCrosshairs(
 	}
 
 	hitIndicator := &Crosshairs{}
-	copier.Copy(hitIndicator, c)
+	Copy(hitIndicator, c)
 	hitIndicator.SpriteInstance.SetAnimationFrame(hitIndex)
 	c.HitIndicator = hitIndicator
 

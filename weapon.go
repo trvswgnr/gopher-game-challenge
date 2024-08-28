@@ -7,7 +7,6 @@ import (
 	"github.com/harbdog/raycaster-go/geom"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/jinzhu/copier"
 )
 
 type Weapon struct {
@@ -51,8 +50,8 @@ func (w *Weapon) Fire() bool {
 func (w *Weapon) SpawnProjectile(x, y, z, angle, pitch float64, spawnedBy *Entity) *Projectile {
 	p := &Projectile{}
 	s := &SpriteInstance{}
-	copier.Copy(p, w.projectile)
-	copier.Copy(s, w.projectile.SpriteInstance)
+	Copy(p, w.projectile)
+	Copy(s, w.projectile.SpriteInstance)
 
 	p.SpriteInstance = s
 	p.Position = &geom.Vector2{X: x, Y: y}

@@ -8,7 +8,6 @@ import (
 	"github.com/harbdog/raycaster-go/geom"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/jinzhu/copier"
 )
 
 type Projectile struct {
@@ -61,8 +60,8 @@ func NewAnimatedProjectile(
 func (p *Projectile) SpawnEffect(x, y, z, angle, pitch float64) *Effect {
 	e := &Effect{}
 	s := &SpriteInstance{}
-	copier.Copy(e, p.ImpactEffect)
-	copier.Copy(s, p.ImpactEffect.SpriteInstance)
+	Copy(e, p.ImpactEffect)
+	Copy(s, p.ImpactEffect.SpriteInstance)
 
 	e.SpriteInstance = s
 	e.Position = &geom.Vector2{X: x, Y: y}
