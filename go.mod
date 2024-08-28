@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.7.8
-	github.com/harbdog/raycaster-go v1.11.1
 	github.com/jinzhu/copier v0.4.0
 )
 

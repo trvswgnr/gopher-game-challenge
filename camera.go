@@ -578,7 +578,7 @@ func (c *Camera) castLevel(x int, grid [][]int, lvl *level, levelNum int, wg *sy
 					floorTex.Pix[pxOffset+3]}
 
 				// lighting
-				pixelSt := &color.RGBA{255, 255, 255, 255}
+				pixelSt := &color.RGBA{R: 255, G: 255, B: 255}
 				shadowDepth := math.Sqrt(currentDist) * c.lightFalloff
 				pixelSt.R = byte(ClampInt(int(float64(pixelSt.R)+shadowDepth+c.globalIllumination), int(c.minLightRGB.R), int(c.maxLightRGB.R)))
 				pixelSt.G = byte(ClampInt(int(float64(pixelSt.G)+shadowDepth+c.globalIllumination), int(c.minLightRGB.G), int(c.maxLightRGB.G)))
