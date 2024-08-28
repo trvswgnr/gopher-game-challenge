@@ -9,8 +9,6 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/harbdog/raycaster-go"
-	"github.com/harbdog/raycaster-go/geom"
 )
 
 //go:embed resources
@@ -126,7 +124,7 @@ func (g *Game) loadSprites() {
 	chargedBoltCollisionHeight := 2 * chargedBoltCollisionRadius
 	chargedBoltProjectile := NewAnimatedProjectile(
 		0, 0, chargedBoltScale, 1, chargedBoltImg, blueish,
-		chargedBoltCols, chargedBoltRows, raycaster.AnchorCenter, chargedBoltCollisionRadius, chargedBoltCollisionHeight,
+		chargedBoltCols, chargedBoltRows, AnchorCenter, chargedBoltCollisionRadius, chargedBoltCollisionHeight,
 	)
 
 	redBoltImg := g.tex.textures[22]
@@ -138,17 +136,17 @@ func (g *Game) loadSprites() {
 	redBoltCollisionHeight := 2 * redBoltCollisionRadius
 	redBoltProjectile := NewProjectile(
 		0, 0, redBoltScale, redBoltImg, reddish,
-		raycaster.AnchorCenter, redBoltCollisionRadius, redBoltCollisionHeight,
+		AnchorCenter, redBoltCollisionRadius, redBoltCollisionHeight,
 	)
 
 	// preload effect sprites
 	blueExplosionEffect := NewEffect(
-		0, 0, 0.75, 3, g.tex.textures[18], 5, 3, raycaster.AnchorCenter, 1,
+		0, 0, 0.75, 3, g.tex.textures[18], 5, 3, AnchorCenter, 1,
 	)
 	chargedBoltProjectile.ImpactEffect = *blueExplosionEffect
 
 	redExplosionEffect := NewEffect(
-		0, 0, 0.20, 1, g.tex.textures[23], 8, 3, raycaster.AnchorCenter, 1,
+		0, 0, 0.20, 1, g.tex.textures[23], 8, 3, AnchorCenter, 1,
 	)
 	redBoltProjectile.ImpactEffect = *redExplosionEffect
 
@@ -174,24 +172,24 @@ func (g *Game) loadSprites() {
 	sorcCollisionRadius := (sorcScale * sorcPxRadius) / (float64(sorcWidth) / float64(sorcCols))
 	sorcCollisionHeight := (sorcScale * sorcPxHeight) / (float64(sorcHeight) / float64(sorcRows))
 	sorc := NewAnimatedSprite(
-		22.5, 11.75, sorcScale, 5, sorcImg, yellow, sorcCols, sorcRows, raycaster.AnchorBottom, sorcCollisionRadius, sorcCollisionHeight,
+		22.5, 11.75, sorcScale, 5, sorcImg, yellow, sorcCols, sorcRows, AnchorBottom, sorcCollisionRadius, sorcCollisionHeight,
 	)
 	// give sprite a sample velocity for movement
-	sorc.Angle = geom.Radians(180)
+	sorc.Angle = Radians(180)
 	sorc.Velocity = 0.02
 	g.addSprite(sorc)
 
 	// animated walking 8-directional sprite character
 	// [walkerTexFacingMap] player facing angle : texture row index
 	var walkerTexFacingMap = map[float64]int{
-		geom.Radians(315): 0,
-		geom.Radians(270): 1,
-		geom.Radians(225): 2,
-		geom.Radians(180): 3,
-		geom.Radians(135): 4,
-		geom.Radians(90):  5,
-		geom.Radians(45):  6,
-		geom.Radians(0):   7,
+		Radians(315): 0,
+		Radians(270): 1,
+		Radians(225): 2,
+		Radians(180): 3,
+		Radians(135): 4,
+		Radians(90):  5,
+		Radians(45):  6,
+		Radians(0):   7,
 	}
 	walkerImg := g.tex.textures[19]
 	walkerWidth, walkerHeight := walkerImg.Bounds().Dx(), walkerImg.Bounds().Dy()
@@ -203,22 +201,22 @@ func (g *Game) loadSprites() {
 	walkerCollisionRadius := (walkerScale * walkerPxRadius) / (float64(walkerWidth) / float64(walkerCols))
 	walkerCollisionHeight := (walkerScale * walkerPxHeight) / (float64(walkerHeight) / float64(walkerRows))
 	walker := NewAnimatedSprite(
-		7.5, 6.0, walkerScale, 10, walkerImg, yellow, walkerCols, walkerRows, raycaster.AnchorBottom, walkerCollisionRadius, walkerCollisionHeight,
+		7.5, 6.0, walkerScale, 10, walkerImg, yellow, walkerCols, walkerRows, AnchorBottom, walkerCollisionRadius, walkerCollisionHeight,
 	)
 	walker.SetAnimationReversed(true) // this sprite sheet has reversed animation frame order
 	walker.SetTextureFacingMap(walkerTexFacingMap)
 	// give sprite a sample velocity for movement
-	walker.Angle = geom.Radians(0)
+	walker.Angle = Radians(0)
 	walker.Velocity = 0.02
 	g.addSprite(walker)
 
 	// animated flying 4-directional sprite creature
 	// [batTexFacingMap] player facing angle : texture row index
 	var batTexFacingMap = map[float64]int{
-		geom.Radians(270): 1,
-		geom.Radians(180): 2,
-		geom.Radians(90):  3,
-		geom.Radians(0):   0,
+		Radians(270): 1,
+		Radians(180): 2,
+		Radians(90):  3,
+		Radians(0):   0,
 	}
 	batImg := g.tex.textures[24]
 	batWidth, batHeight := batImg.Bounds().Dx(), batImg.Bounds().Dy()
@@ -230,13 +228,13 @@ func (g *Game) loadSprites() {
 	batCollisionRadius := (batScale * batPxRadius) / (float64(batWidth) / float64(batCols))
 	batCollisionHeight := (batScale * batPxHeight) / (float64(batHeight) / float64(batRows))
 	batty := NewAnimatedSprite(
-		10.0, 5.0, batScale, 10, batImg, yellow, batCols, batRows, raycaster.AnchorTop, batCollisionRadius, batCollisionHeight,
+		10.0, 5.0, batScale, 10, batImg, yellow, batCols, batRows, AnchorTop, batCollisionRadius, batCollisionHeight,
 	)
 	batty.SetTextureFacingMap(batTexFacingMap)
-	// raising Z-position of sprite model but using raycaster.AnchorTop to show below that position
+	// raising Z-position of sprite model but using AnchorTop to show below that position
 	batty.PositionZ = 1.0
 	// give sprite a sample velocity for movement
-	batty.Angle = geom.Radians(150)
+	batty.Angle = Radians(150)
 	batty.Velocity = 0.03
 	g.addSprite(batty)
 
@@ -256,67 +254,67 @@ func (g *Game) loadSprites() {
 	rockPxRadius, rockPxHeight := 24.0, 35.0
 	rockCollisionRadius := (rockScale * rockPxRadius) / float64(rockWidth)
 	rockCollisionHeight := (rockScale * rockPxHeight) / float64(rockHeight)
-	rock := NewSprite(8.0, 5.5, rockScale, rockImg, brown, raycaster.AnchorBottom, rockCollisionRadius, rockCollisionHeight)
+	rock := NewSprite(8.0, 5.5, rockScale, rockImg, brown, AnchorBottom, rockCollisionRadius, rockCollisionHeight)
 	g.addSprite(rock)
 
 	// testing sprite scaling
 	testScale := 0.5
-	g.addSprite(NewSprite(10.5, 2.5, testScale, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(10.5, 2.5, testScale, g.tex.textures[9], green, AnchorBottom, 0, 0))
 
 	// // line of trees for testing in front of initial view
 	// Setting CollisionRadius=0 to disable collision against small trees
-	g.addSprite(NewSprite(19.5, 11.5, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(17.5, 11.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(15.5, 11.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(19.5, 11.5, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(17.5, 11.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(15.5, 11.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
 	// // // render a forest!
-	g.addSprite(NewSprite(11.5, 1.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 1.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(132.5, 1.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 2, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 2, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 2, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 2.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.25, 2.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 2.25, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 3, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 3, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.25, 3, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(10.5, 3.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 3.25, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 3.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.25, 3.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(10.5, 4, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 4, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 4, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 4, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(10.5, 4.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.25, 4.5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 4.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 4.5, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.5, 4.25, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(10.5, 5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 5, 1.0, g.tex.textures[9], green, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.25, 5, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.5, 5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 5.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 5.25, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 5.25, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.5, 5.5, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(15.5, 5.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(11.5, 6, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 6, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.25, 6, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.25, 6, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(15.5, 6, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 6.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 6.25, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.5, 6.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(12.5, 7, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 7, 1.0, g.tex.textures[10], brown, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(14.5, 7, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 7.5, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
-	g.addSprite(NewSprite(13.5, 8, 1.0, g.tex.textures[14], orange, raycaster.AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 1.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 1.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(132.5, 1.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 2, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 2, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 2, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 2.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.25, 2.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 2.25, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 3, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 3, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.25, 3, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(10.5, 3.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 3.25, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 3.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.25, 3.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(10.5, 4, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 4, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 4, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 4, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(10.5, 4.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.25, 4.5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 4.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 4.5, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.5, 4.25, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(10.5, 5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 5, 1.0, g.tex.textures[9], green, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.25, 5, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.5, 5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 5.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 5.25, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 5.25, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.5, 5.5, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(15.5, 5.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(11.5, 6, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 6, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.25, 6, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.25, 6, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(15.5, 6, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 6.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 6.25, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.5, 6.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(12.5, 7, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 7, 1.0, g.tex.textures[10], brown, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(14.5, 7, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 7.5, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
+	g.addSprite(NewSprite(13.5, 8, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
 }
 
 func (g *Game) addSprite(sprite *SpriteInstance) {

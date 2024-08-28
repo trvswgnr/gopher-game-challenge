@@ -7,12 +7,64 @@ import (
 	"math"
 	"sort"
 
-	"github.com/harbdog/raycaster-go"
-	"github.com/harbdog/raycaster-go/geom"
-
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
+
+type Sprite interface {
+	// Pos returns the X,Y map position
+	Pos() *Vector2
+
+	// PosZ returns the Z (vertical) position
+	PosZ() float64
+
+	// Scale returns the scale factor (for no scaling, default to 1.0)
+	Scale() float64
+
+	// VerticalAnchor returns the vertical anchor position (only used when scaling image)
+	VerticalAnchor() SpriteAnchor
+
+	// Texture needs to return the current image to render
+	Texture() *ebiten.Image
+
+	// TextureRect needs to return the rectangle of the texture coordinates to draw
+	TextureRect() image.Rectangle
+
+	// Illumination needs to return sprite specific illumination offset (for normal illumination, default to 0)
+	Illumination() float64
+
+	// SetScreenRect accepts the raycasted rectangle of the screen coordinates to be rendered (nil if not on screen)
+	SetScreenRect(rect *image.Rectangle)
+
+	// IsFocusable should return true only if the convergence point can focus on the sprite
+	IsFocusable() bool
+}
+
+type SpriteAnchor int
+
+const (
+	// AnchorBottom anchors the bottom of the sprite to its Z-position
+	AnchorBottom SpriteAnchor = iota
+	// AnchorCenter anchors the center of the sprite to its Z-position
+	AnchorCenter
+	// AnchorTop anchors the top of the sprite to its Z-position
+	AnchorTop
+)
+
+func getAnchorVerticalOffset(anchor SpriteAnchor, spriteScale float64, cameraHeight int) float64 {
+	halfHeight := float64(cameraHeight) / 2
+
+	switch anchor {
+	case AnchorBottom:
+		return halfHeight - (spriteScale * halfHeight)
+	case AnchorCenter:
+		return halfHeight
+	case AnchorTop:
+		return halfHeight + (spriteScale * halfHeight)
+	}
+
+	return 0
+}
 
 type SpriteInstance struct {
 	*Entity
@@ -36,7 +88,7 @@ func (s *SpriteInstance) Scale() float64 {
 	return s.Entity.Scale
 }
 
-func (s *SpriteInstance) VerticalAnchor() raycaster.SpriteAnchor {
+func (s *SpriteInstance) VerticalAnchor() SpriteAnchor {
 	return s.Entity.Anchor
 }
 
@@ -62,11 +114,11 @@ func (s *SpriteInstance) IsFocusable() bool {
 
 func NewSprite(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
-	anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
+	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *SpriteInstance {
 	s := &SpriteInstance{
 		Entity: &Entity{
-			Position:        &geom.Vector2{X: x, Y: y},
+			Position:        &Vector2{X: x, Y: y},
 			PositionZ:       0,
 			Scale:           scale,
 			Anchor:          anchor,
@@ -93,11 +145,11 @@ func NewSprite(
 
 func NewSpriteFromSheet(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
-	columns, rows, spriteIndex int, anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
+	columns, rows, spriteIndex int, anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *SpriteInstance {
 	s := &SpriteInstance{
 		Entity: &Entity{
-			Position:        &geom.Vector2{X: x, Y: y},
+			Position:        &Vector2{X: x, Y: y},
 			PositionZ:       0,
 			Scale:           scale,
 			Anchor:          anchor,
@@ -140,11 +192,11 @@ func NewSpriteFromSheet(
 
 func NewAnimatedSprite(
 	x, y, scale float64, animationRate int, img *ebiten.Image, mapColor color.RGBA,
-	columns, rows int, anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
+	columns, rows int, anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *SpriteInstance {
 	s := &SpriteInstance{
 		Entity: &Entity{
-			Position:        &geom.Vector2{X: x, Y: y},
+			Position:        &Vector2{X: x, Y: y},
 			PositionZ:       0,
 			Scale:           scale,
 			Anchor:          anchor,
@@ -208,7 +260,7 @@ func (s *SpriteInstance) getTextureFacingKeyForAngle(facingAngle float64) float6
 
 	closestKeyDiff := math.MaxFloat64
 	for _, keyAngle := range s.texFacingKeys {
-		keyDiff := math.Min(geom.Pi2-math.Abs(float64(keyAngle)-facingAngle), math.Abs(float64(keyAngle)-facingAngle))
+		keyDiff := math.Min(Pi2-math.Abs(float64(keyAngle)-facingAngle), math.Abs(float64(keyAngle)-facingAngle))
 		if keyDiff < closestKeyDiff {
 			closestKeyDiff = keyDiff
 			closestKeyAngle = keyAngle
@@ -240,7 +292,7 @@ func (s *SpriteInstance) ScreenRect() *image.Rectangle {
 	return s.screenRect
 }
 
-func (s *SpriteInstance) Update(camPos *geom.Vector2) {
+func (s *SpriteInstance) Update(camPos *Vector2) {
 	if s.AnimationRate <= 0 {
 		return
 	}
@@ -257,11 +309,11 @@ func (s *SpriteInstance) Update(camPos *geom.Vector2) {
 			texRow := 0
 
 			// calculate angle from sprite relative to camera position by getting angle of line between them
-			lineToCam := geom.Line{X1: s.Position.X, Y1: s.Position.Y, X2: camPos.X, Y2: camPos.Y}
+			lineToCam := Line{X1: s.Position.X, Y1: s.Position.Y, X2: camPos.X, Y2: camPos.Y}
 			facingAngle := lineToCam.Angle() - s.Angle
 			if facingAngle < 0 {
 				// convert to positive angle needed to determine facing index to use
-				facingAngle += geom.Pi2
+				facingAngle += Pi2
 			}
 			facingKeyAngle := s.getTextureFacingKeyForAngle(facingAngle)
 			if texFacingValue, ok := s.texFacingMap[facingKeyAngle]; ok {

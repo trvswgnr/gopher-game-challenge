@@ -4,7 +4,6 @@ import (
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/harbdog/raycaster-go"
 )
 
 type Crosshairs struct {
@@ -19,10 +18,10 @@ func NewCrosshairs(
 	mapColor := color.RGBA{0, 0, 0, 0}
 
 	normalCrosshairs := &Crosshairs{
-		SpriteInstance: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, raycaster.AnchorCenter, 0, 0),
+		SpriteInstance: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, AnchorCenter, 0, 0),
 	}
 
-	hitCrosshairs := NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, hitIndex, raycaster.AnchorCenter, 0, 0)
+	hitCrosshairs := NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, hitIndex, AnchorCenter, 0, 0)
 
 	hitCrosshairs.SetAnimationFrame(hitIndex)
 	normalCrosshairs.HitIndicator = hitCrosshairs

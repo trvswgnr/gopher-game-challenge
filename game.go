@@ -13,9 +13,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	"github.com/harbdog/raycaster-go"
-	"github.com/harbdog/raycaster-go/geom"
-	"github.com/harbdog/raycaster-go/geom3d"
 )
 
 const (
@@ -33,7 +30,7 @@ type Game struct {
 	paused bool
 
 	//--create slicer and declare slices--//
-	tex                *TextureHandler
+	tex                *TextureHandlerInstance
 	initRenderFloorTex bool
 
 	// window resolution and scaling
@@ -54,7 +51,7 @@ type Game struct {
 	player *Player
 
 	//--define camera and render scene--//
-	camera *raycaster.Camera
+	camera *Camera
 	scene  *ebiten.Image
 
 	mouseX, mouseY int
@@ -73,8 +70,8 @@ type Game struct {
 	maxLightRGB        *color.NRGBA
 
 	//--array of levels, levels refer to "floors" of the world--//
-	mapObj       *Map
-	collisionMap []geom.Line
+	mapObj       *MapInstance
+	collisionMap []Line
 
 	sprites     map[*SpriteInstance]struct{}
 	projectiles map[*Projectile]struct{}
@@ -144,7 +141,7 @@ func NewGame() *Game {
 
 	// init player model
 	angleDegrees := 60.0
-	g.player = NewPlayer(8.5, 3.5, geom.Radians(angleDegrees), 0)
+	g.player = NewPlayer(8.5, 3.5, Radians(angleDegrees), 0)
 	g.player.CollisionRadius = clipDistance
 	g.player.CollisionHeight = 0.5
 
@@ -156,7 +153,7 @@ func NewGame() *Game {
 	g.mouseX, g.mouseY = math.MinInt32, math.MinInt32
 
 	//--init camera and renderer--//
-	g.camera = raycaster.NewCamera(g.width, g.height, texWidth, g.mapObj, g.tex)
+	g.camera = NewCamera(g.width, g.height, texWidth, g.mapObj, g.tex)
 	g.setRenderDistance(g.renderDistance)
 
 	g.camera.SetFloorTexture(getTextureFromFile("floor.png"))
@@ -222,7 +219,7 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Put projectiles together with sprites for raycasting both as sprites
 	numSprites, numProjectiles, numEffects := len(g.sprites), len(g.projectiles), len(g.effects)
-	raycastSprites := make([]raycaster.Sprite, numSprites+numProjectiles+numEffects)
+	raycastSprites := make([]Sprite, numSprites+numProjectiles+numEffects)
 	index := 0
 	for sprite := range g.sprites {
 		raycastSprites[index] = sprite
@@ -448,7 +445,7 @@ func (g *Game) fireWeapon() {
 	w.Fire()
 
 	// spawning projectile at player position just slightly below player's center point of view
-	pX, pY, pZ := g.player.Position.X, g.player.Position.Y, geom.Clamp(g.player.cameraZ-0.1, 0.05, 0.95)
+	pX, pY, pZ := g.player.Position.X, g.player.Position.Y, Clamp(g.player.cameraZ-0.1, 0.05, 0.95)
 	// pitch, angle based on raycasted point at crosshairs
 	var pAngle, pPitch float64
 	convergenceDistance := g.camera.GetConvergenceDistance()
@@ -456,7 +453,7 @@ func (g *Game) fireWeapon() {
 	if convergenceDistance <= 0 || convergencePoint == nil {
 		pAngle, pPitch = g.player.Angle, g.player.Pitch
 	} else {
-		convergenceLine3d := &geom3d.Line3d{
+		convergenceLine3d := &Line3d{
 			X1: pX, Y1: pY, Z1: pZ,
 			X2: convergencePoint.X, Y2: convergencePoint.Y, Z2: convergencePoint.Z,
 		}
@@ -490,7 +487,7 @@ func (g *Game) updateProjectiles() {
 	for p := range g.projectiles {
 		if p.Velocity != 0 {
 
-			trajectory := geom3d.Line3dFromAngle(p.Position.X, p.Position.Y, p.PositionZ, p.Angle, p.Pitch, p.Velocity)
+			trajectory := Line3dFromAngle(p.Position.X, p.Position.Y, p.PositionZ, p.Angle, p.Pitch, p.Velocity)
 
 			xCheck := trajectory.X2
 			yCheck := trajectory.Y2
@@ -543,7 +540,7 @@ func (g *Game) updateSprites() {
 	// Testing animated sprite movement
 	for s := range g.sprites {
 		if s.Velocity != 0 {
-			vLine := geom.LineFromAngle(s.Position.X, s.Position.Y, s.Angle, s.Velocity)
+			vLine := LineFromAngle(s.Position.X, s.Position.Y, s.Angle, s.Velocity)
 
 			xCheck := vLine.X2
 			yCheck := vLine.Y2

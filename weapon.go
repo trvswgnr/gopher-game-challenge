@@ -3,9 +3,6 @@ package main
 import (
 	"image/color"
 
-	"github.com/harbdog/raycaster-go"
-	"github.com/harbdog/raycaster-go/geom"
-
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -23,7 +20,7 @@ func NewAnimatedWeapon(
 ) *Weapon {
 	mapColor := color.RGBA{0, 0, 0, 0}
 	w := &Weapon{
-		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, raycaster.AnchorCenter, 0, 0),
+		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, AnchorCenter, 0, 0),
 	}
 	w.projectile = projectile
 	w.projectileVelocity = projectileVelocity
@@ -52,7 +49,7 @@ func (w *Weapon) SpawnProjectile(x, y, z, angle, pitch float64, spawnedBy *Entit
 	s := Clone(w.projectile.SpriteInstance)
 
 	p.SpriteInstance = s
-	p.Position = &geom.Vector2{X: x, Y: y}
+	p.Position = &Vector2{X: x, Y: y}
 	p.PositionZ = z
 	p.Angle = angle
 	p.Pitch = pitch

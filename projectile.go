@@ -4,9 +4,6 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/harbdog/raycaster-go"
-	"github.com/harbdog/raycaster-go/geom"
-
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -19,7 +16,7 @@ type Projectile struct {
 
 func NewProjectile(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
-	anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
+	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *Projectile {
 	p := &Projectile{
 		SpriteInstance: NewSprite(x, y, scale, img, mapColor, anchor, collisionRadius, collisionHeight),
@@ -39,7 +36,7 @@ func NewProjectile(
 
 func NewAnimatedProjectile(
 	x, y, scale float64, animationRate int, img *ebiten.Image, mapColor color.RGBA, columns, rows int,
-	anchor raycaster.SpriteAnchor, collisionRadius, collisionHeight float64,
+	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *Projectile {
 	p := &Projectile{
 		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, collisionRadius, collisionHeight),
@@ -62,7 +59,7 @@ func (p *Projectile) SpawnEffect(x, y, z, angle, pitch float64) *Effect {
 	spriteInstance := Clone(p.ImpactEffect.SpriteInstance)
 
 	impactEffect.SpriteInstance = spriteInstance
-	impactEffect.Position = &geom.Vector2{X: x, Y: y}
+	impactEffect.Position = &Vector2{X: x, Y: y}
 	impactEffect.PositionZ = z
 	impactEffect.Angle = angle
 	impactEffect.Pitch = pitch

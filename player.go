@@ -3,8 +3,6 @@ package main
 import (
 	"image/color"
 	"math"
-
-	"github.com/harbdog/raycaster-go/geom"
 )
 
 type Player struct {
@@ -22,7 +20,7 @@ type Player struct {
 func NewPlayer(x, y, angle, pitch float64) *Player {
 	p := &Player{
 		Entity: &Entity{
-			Position:  &geom.Vector2{X: x, Y: y},
+			Position:  &Vector2{X: x, Y: y},
 			PositionZ: 0,
 			Angle:     angle,
 			Pitch:     pitch,
@@ -157,7 +155,7 @@ func (p *Player) Stand() {
 func (p *Player) updatePitch(pModifier float64) {
 	pSpeed := playerRotateSpeed * pModifier
 	// current raycasting method can only allow up to 22.5 degrees down, 45 degrees up
-	p.Pitch = geom.Clamp(pSpeed+p.Pitch, -math.Pi/8, math.Pi/4)
+	p.Pitch = Clamp(pSpeed+p.Pitch, -math.Pi/8, math.Pi/4)
 	p.moved = true
 }
 
@@ -182,7 +180,7 @@ const (
 // move player by move speed in the forward/backward direction
 func (g *Game) move(moveModifier float64) {
 	mSpeed := playerMoveSpeed * moveModifier
-	moveLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle, mSpeed)
+	moveLine := LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle, mSpeed)
 
 	newPos, _, _ := g.getValidMove(g.player.Entity, moveLine.X2, moveLine.Y2, g.player.PositionZ, true)
 	if !newPos.Equals(g.player.Pos()) {
@@ -194,11 +192,11 @@ func (g *Game) move(moveModifier float64) {
 // Move player by strafe speed in the left/right direction
 func (g *Game) strafe(moveModifier float64) {
 	mSpeed := playerStrafeSpeed * moveModifier
-	strafeAngle := geom.HalfPi
+	strafeAngle := HalfPi
 	if mSpeed < 0 {
 		strafeAngle = -strafeAngle
 	}
-	strafeLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle-strafeAngle, math.Abs(mSpeed))
+	strafeLine := LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle-strafeAngle, math.Abs(mSpeed))
 
 	newPos, _, _ := g.getValidMove(g.player.Entity, strafeLine.X2, strafeLine.Y2, g.player.PositionZ, true)
 	if !newPos.Equals(g.player.Pos()) {
@@ -212,11 +210,11 @@ func (p *Player) rotate(rModifier float64) {
 	rSpeed := playerRotateSpeed * rModifier
 	p.Angle += rSpeed
 
-	for p.Angle > geom.Pi {
-		p.Angle = p.Angle - geom.Pi2
+	for p.Angle > Pi {
+		p.Angle = p.Angle - Pi2
 	}
-	for p.Angle <= -geom.Pi {
-		p.Angle = p.Angle + geom.Pi2
+	for p.Angle <= -Pi {
+		p.Angle = p.Angle + Pi2
 	}
 
 	p.moved = true

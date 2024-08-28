@@ -1,19 +1,25 @@
 package main
 
-import "github.com/harbdog/raycaster-go/geom"
+type Map interface {
+	// Level returns the 2-dimensional array of texture indices for each level
+	Level(levelNum int) [][]int
+
+	// NumLevels returns the number of vertical levels (minimum of 1)
+	NumLevels() int
+}
 
 // a multi-layered map
-type Map struct {
+type MapInstance struct {
 	bottom [][]int
 	middle [][]int
 	top    [][]int
 }
 
-func (m *Map) NumLevels() int {
+func (m *MapInstance) NumLevels() int {
 	return 4
 }
 
-func (m *Map) Level(level int) [][]int {
+func (m *MapInstance) Level(level int) [][]int {
 	if level == 0 {
 		return m.bottom
 	} else if level == 1 {
@@ -23,8 +29,8 @@ func (m *Map) Level(level int) [][]int {
 	}
 }
 
-func NewMap() *Map {
-	m := &Map{}
+func NewMap() *MapInstance {
+	m := &MapInstance{}
 
 	m.bottom = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -110,18 +116,18 @@ func NewMap() *Map {
 	return m
 }
 
-func (m *Map) GetCollisionLines(clipDistance float64) []geom.Line {
+func (m *MapInstance) GetCollisionLines(clipDistance float64) []Line {
 	if len(m.bottom) == 0 || len(m.bottom[0]) == 0 {
-		return []geom.Line{}
+		return []Line{}
 	}
 
-	lines := geom.Rect(clipDistance, clipDistance,
+	lines := Rect(clipDistance, clipDistance,
 		float64(len(m.bottom))-2*clipDistance, float64(len(m.bottom[0]))-2*clipDistance)
 
 	for x, row := range m.bottom {
 		for y, value := range row {
 			if value > 0 {
-				lines = append(lines, geom.Rect(float64(x)-clipDistance, float64(y)-clipDistance,
+				lines = append(lines, Rect(float64(x)-clipDistance, float64(y)-clipDistance,
 					1.0+(2*clipDistance), 1.0+(2*clipDistance))...)
 			}
 		}
