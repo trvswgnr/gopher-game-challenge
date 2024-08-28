@@ -83,7 +83,7 @@ func NewSprite(
 	s.lenTex = 1
 	s.textures = make([]*ebiten.Image, s.lenTex)
 
-	s.W, s.H = img.Size()
+	s.W, s.H = img.Bounds().Dx(), img.Bounds().Dy()
 	s.texRects = []image.Rectangle{image.Rect(0, 0, s.W, s.H)}
 
 	s.textures[0] = img
@@ -116,7 +116,7 @@ func NewSpriteFromSheet(
 	s.textures = make([]*ebiten.Image, s.lenTex)
 	s.texRects = make([]image.Rectangle, s.lenTex)
 
-	w, h := img.Size()
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
 
 	// crop sheet by given number of columns and rows into a single dimension array
 	s.W = w / columns
@@ -167,7 +167,7 @@ func NewAnimatedSprite(
 	s.textures = make([]*ebiten.Image, s.lenTex)
 	s.texRects = make([]image.Rectangle, s.lenTex)
 
-	w, h := img.Size()
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
 
 	// crop sheet by given number of columns and rows into a single dimension array
 	s.W = w / columns
