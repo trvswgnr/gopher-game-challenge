@@ -10,23 +10,24 @@ import (
 type Crosshairs struct {
 	*SpriteInstance
 	hitTimer     int
-	HitIndicator *Crosshairs
+	HitIndicator *SpriteInstance
 }
 
 func NewCrosshairs(
 	x, y, scale float64, img *ebiten.Image, columns, rows, crosshairIndex, hitIndex int,
 ) *Crosshairs {
 	mapColor := color.RGBA{0, 0, 0, 0}
-	c := &Crosshairs{
+
+	normalCrosshairs := &Crosshairs{
 		SpriteInstance: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, raycaster.AnchorCenter, 0, 0),
 	}
 
-	hitIndicator := &Crosshairs{}
-	Copy(hitIndicator, c)
-	hitIndicator.SpriteInstance.SetAnimationFrame(hitIndex)
-	c.HitIndicator = hitIndicator
+	hitCrosshairs := NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, hitIndex, raycaster.AnchorCenter, 0, 0)
 
-	return c
+	hitCrosshairs.SetAnimationFrame(hitIndex)
+	normalCrosshairs.HitIndicator = hitCrosshairs
+
+	return normalCrosshairs
 }
 
 func (c *Crosshairs) ActivateHitIndicator(hitTime int) {
