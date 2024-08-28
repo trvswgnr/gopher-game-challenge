@@ -70,7 +70,7 @@ type Game struct {
 	maxLightRGB        *color.NRGBA
 
 	//--array of levels, levels refer to "floors" of the world--//
-	mapObj       *MapInstance
+	mapObj       *Map
 	collisionMap []Line
 
 	sprites     map[*Sprite]struct{}

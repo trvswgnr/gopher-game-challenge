@@ -1,25 +1,17 @@
 package main
 
-type Map interface {
-	// Level returns the 2-dimensional array of texture indices for each level
-	Level(levelNum int) [][]int
-
-	// NumLevels returns the number of vertical levels (minimum of 1)
-	NumLevels() int
-}
-
 // a multi-layered map
-type MapInstance struct {
+type Map struct {
 	bottom [][]int
 	middle [][]int
 	top    [][]int
 }
 
-func (m *MapInstance) NumLevels() int {
+func (m *Map) NumLevels() int {
 	return 4
 }
 
-func (m *MapInstance) Level(level int) [][]int {
+func (m *Map) Level(level int) [][]int {
 	if level == 0 {
 		return m.bottom
 	} else if level == 1 {
@@ -29,8 +21,8 @@ func (m *MapInstance) Level(level int) [][]int {
 	}
 }
 
-func NewMap() *MapInstance {
-	m := &MapInstance{}
+func NewMap() *Map {
+	m := &Map{}
 
 	m.bottom = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -116,7 +108,7 @@ func NewMap() *MapInstance {
 	return m
 }
 
-func (m *MapInstance) GetCollisionLines(clipDistance float64) []Line {
+func (m *Map) GetCollisionLines(clipDistance float64) []Line {
 	if len(m.bottom) == 0 || len(m.bottom[0]) == 0 {
 		return []Line{}
 	}

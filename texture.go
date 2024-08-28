@@ -15,13 +15,13 @@ type TextureHandler interface {
 }
 
 type TextureHandlerInstance struct {
-	mapObj         *MapInstance
+	mapObj         *Map
 	textures       []*ebiten.Image
 	floorTex       *image.RGBA
 	renderFloorTex bool
 }
 
-func NewTextureHandler(mapObj *MapInstance, textureCapacity int) *TextureHandlerInstance {
+func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandlerInstance {
 	t := &TextureHandlerInstance{
 		mapObj:         mapObj,
 		textures:       make([]*ebiten.Image, textureCapacity),

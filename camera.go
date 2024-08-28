@@ -44,7 +44,7 @@ type Camera struct {
 	fovAngle, fovDepth float64
 
 	//--world map--//
-	mapObj    Map
+	mapObj    *Map
 	mapWidth  int
 	mapHeight int
 
@@ -97,7 +97,7 @@ type Camera struct {
 }
 
 // NewCamera initalizes a Camera object
-func NewCamera(width int, height int, texSize int, mapObj Map, tex TextureHandler) *Camera {
+func NewCamera(width int, height int, texSize int, mapObj *Map, tex TextureHandler) *Camera {
 
 	c := &Camera{}
 
