@@ -30,7 +30,7 @@ type Game struct {
 	paused bool
 
 	//--create slicer and declare slices--//
-	tex                *TextureHandlerInstance
+	tex                *TextureHandler
 	initRenderFloorTex bool
 
 	// window resolution and scaling

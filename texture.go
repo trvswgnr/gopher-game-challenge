@@ -6,23 +6,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-type TextureHandler interface {
-	// TextureAt reutrns image used for rendered wall at the given x, y map coordinates and level number
-	TextureAt(x, y, levelNum, side int) *ebiten.Image
-
-	// FloorTextureAt returns image used for textured floor at the given x, y map coordinates
-	FloorTextureAt(x, y int) *image.RGBA
-}
-
-type TextureHandlerInstance struct {
+type TextureHandler struct {
 	mapObj         *Map
 	textures       []*ebiten.Image
 	floorTex       *image.RGBA
 	renderFloorTex bool
 }
 
-func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandlerInstance {
-	t := &TextureHandlerInstance{
+func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandler {
+	t := &TextureHandler{
 		mapObj:         mapObj,
 		textures:       make([]*ebiten.Image, textureCapacity),
 		renderFloorTex: true,
@@ -30,7 +22,7 @@ func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandlerInstance
 	return t
 }
 
-func (t *TextureHandlerInstance) TextureAt(x, y, levelNum, side int) *ebiten.Image {
+func (t *TextureHandler) TextureAt(x, y, levelNum, side int) *ebiten.Image {
 	texNum := -1
 
 	mapLayer := t.mapObj.Level(levelNum)
@@ -78,7 +70,7 @@ func (t *TextureHandlerInstance) TextureAt(x, y, levelNum, side int) *ebiten.Ima
 	return t.textures[texNum]
 }
 
-func (t *TextureHandlerInstance) FloorTextureAt(x, y int) *image.RGBA {
+func (t *TextureHandler) FloorTextureAt(x, y int) *image.RGBA {
 	// x/y could be used to render different floor texture at given coords,
 	// but for this demo we will just be rendering the same texture everywhere.
 	if t.renderFloorTex {

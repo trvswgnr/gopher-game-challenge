@@ -69,7 +69,7 @@ type Camera struct {
 	spriteOrder    []int
 	spriteDistance []float64
 
-	tex TextureHandler
+	tex *TextureHandler
 
 	//--simulates torch light, as if player was carrying a radial light--//
 	lightFalloff float64
@@ -97,7 +97,7 @@ type Camera struct {
 }
 
 // NewCamera initalizes a Camera object
-func NewCamera(width int, height int, texSize int, mapObj *Map, tex TextureHandler) *Camera {
+func NewCamera(width int, height int, texSize int, mapObj *Map, tex *TextureHandler) *Camera {
 
 	c := &Camera{}
 
