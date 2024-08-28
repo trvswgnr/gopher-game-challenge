@@ -25,22 +25,22 @@ func NewTextureHandler(mapObj *Map, textureCapacity int) *TextureHandler {
 func (t *TextureHandler) TextureAt(x, y, levelNum, side int) *ebiten.Image {
 	texNum := -1
 
-	mapLevel := t.mapObj.Level(levelNum)
-	if mapLevel == nil {
+	mapLayer := t.mapObj.Level(levelNum)
+	if mapLayer == nil {
 		return nil
 	}
 
-	mapWidth := len(mapLevel)
+	mapWidth := len(mapLayer)
 	if mapWidth == 0 {
 		return nil
 	}
-	mapHeight := len(mapLevel[0])
+	mapHeight := len(mapLayer[0])
 	if mapHeight == 0 {
 		return nil
 	}
 
 	if x >= 0 && x < mapWidth && y >= 0 && y < mapHeight {
-		texNum = mapLevel[x][y] - 1 // 1 subtracted from it so that texture 0 can be used
+		texNum = mapLayer[x][y] - 1 // 1 subtracted from it so that texture 0 can be used
 	}
 
 	if side == 0 {

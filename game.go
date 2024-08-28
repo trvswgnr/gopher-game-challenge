@@ -203,7 +203,7 @@ func (g *Game) Update() error {
 
 	if !g.paused {
 		// Perform logical updates
-		w := g.player.Weapon
+		w := g.player.weapon
 		if w != nil {
 			w.Update()
 		}
@@ -244,8 +244,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.camera.Draw(g.scene)
 
 	// draw equipped weapon
-	if g.player.Weapon != nil {
-		w := g.player.Weapon
+	if g.player.weapon != nil {
+		w := g.player.weapon
 		op := &ebiten.DrawImageOptions{}
 		op.Filter = ebiten.FilterNearest
 
@@ -435,7 +435,7 @@ func (g *Game) setFovAngle(fovDegrees float64) {
 }
 
 func (g *Game) fireWeapon() {
-	w := g.player.Weapon
+	w := g.player.weapon
 	if w == nil {
 		g.player.NextWeapon(false)
 		return
@@ -448,7 +448,7 @@ func (g *Game) fireWeapon() {
 	w.Fire()
 
 	// spawning projectile at player position just slightly below player's center point of view
-	pX, pY, pZ := g.player.Position.X, g.player.Position.Y, geom.Clamp(g.player.CameraZ-0.1, 0.05, 0.95)
+	pX, pY, pZ := g.player.Position.X, g.player.Position.Y, geom.Clamp(g.player.cameraZ-0.1, 0.05, 0.95)
 	// pitch, angle based on raycasted point at crosshairs
 	var pAngle, pPitch float64
 	convergenceDistance := g.camera.GetConvergenceDistance()
@@ -471,16 +471,16 @@ func (g *Game) fireWeapon() {
 
 // Update camera to match player position and orientation
 func (g *Game) updatePlayerCamera(forceUpdate bool) {
-	if !g.player.Moved && !forceUpdate {
+	if !g.player.moved && !forceUpdate {
 		// only update camera position if player moved or forceUpdate set
 		return
 	}
 
 	// reset player moved flag to only update camera when necessary
-	g.player.Moved = false
+	g.player.moved = false
 
 	g.camera.SetPosition(g.player.Position.Copy())
-	g.camera.SetPositionZ(g.player.CameraZ)
+	g.camera.SetPositionZ(g.player.cameraZ)
 	g.camera.SetHeadingAngle(g.player.Angle)
 	g.camera.SetPitchAngle(g.player.Pitch)
 }
@@ -533,7 +533,7 @@ func (g *Game) updateProjectiles() {
 	// Testing animated effects (explosions)
 	for e := range g.effects {
 		e.Update(g.player.Position)
-		if e.LoopCounter() >= e.LoopCount {
+		if e.LoopCounter() >= e.loopCount {
 			g.deleteEffect(e)
 		}
 	}

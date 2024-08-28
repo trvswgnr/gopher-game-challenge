@@ -9,14 +9,14 @@ import (
 
 type Player struct {
 	*Entity
-	CameraZ      float64
-	Moved        bool
-	Weapon       *Weapon
-	WeaponSet    []*Weapon
-	LastWeapon   *Weapon
-	VelocityZ    float64
-	JumpHoldTime float64
-	IsJumping    bool
+	cameraZ      float64
+	moved        bool
+	weapon       *Weapon
+	weaponSet    []*Weapon
+	lastWeapon   *Weapon
+	velocityZ    float64
+	jumpHoldTime float64
+	isJumping    bool
 }
 
 func NewPlayer(x, y, angle, pitch float64) *Player {
@@ -29,48 +29,48 @@ func NewPlayer(x, y, angle, pitch float64) *Player {
 			Velocity:  0,
 			MapColor:  color.RGBA{255, 0, 0, 255},
 		},
-		CameraZ:      0.5,
-		Moved:        false,
-		WeaponSet:    []*Weapon{},
-		JumpHoldTime: 0,
-		IsJumping:    false,
+		cameraZ:      0.5,
+		moved:        false,
+		weaponSet:    []*Weapon{},
+		jumpHoldTime: 0,
+		isJumping:    false,
 	}
 
 	return p
 }
 
 func (p *Player) AddWeapon(w *Weapon) {
-	p.WeaponSet = append(p.WeaponSet, w)
+	p.weaponSet = append(p.weaponSet, w)
 }
 
 func (p *Player) SelectWeapon(weaponIndex int) *Weapon {
 	// TODO: add some kind of sheath/unsheath animation
 	if weaponIndex < 0 {
 		// put away weapon
-		if p.Weapon != nil {
+		if p.weapon != nil {
 			// store as last weapon
-			p.LastWeapon = p.Weapon
+			p.lastWeapon = p.weapon
 		}
-		p.Weapon = nil
+		p.weapon = nil
 		return nil
 	}
-	newWeapon := p.Weapon
-	if weaponIndex < len(p.WeaponSet) {
-		newWeapon = p.WeaponSet[weaponIndex]
+	newWeapon := p.weapon
+	if weaponIndex < len(p.weaponSet) {
+		newWeapon = p.weaponSet[weaponIndex]
 	}
-	if newWeapon != p.Weapon {
+	if newWeapon != p.weapon {
 		// store as last weapon
-		p.LastWeapon = p.Weapon
-		p.Weapon = newWeapon
+		p.lastWeapon = p.weapon
+		p.weapon = newWeapon
 	}
-	return p.Weapon
+	return p.weapon
 }
 
 func (p *Player) NextWeapon(reverse bool) *Weapon {
 	_, weaponIndex := p.getSelectedWeapon()
 	if weaponIndex < 0 {
 		// check last weapon in event of unsheathing previously sheathed weapon
-		weaponIndex = p.getWeaponIndex(p.LastWeapon)
+		weaponIndex = p.getWeaponIndex(p.lastWeapon)
 		if weaponIndex < 0 {
 			weaponIndex = 0
 		}
@@ -78,7 +78,7 @@ func (p *Player) NextWeapon(reverse bool) *Weapon {
 	}
 
 	weaponIndex++
-	if weaponIndex >= len(p.WeaponSet) {
+	if weaponIndex >= len(p.weaponSet) {
 		weaponIndex = 0
 	}
 	return p.SelectWeapon(weaponIndex)
@@ -88,7 +88,7 @@ func (p *Player) getWeaponIndex(w *Weapon) int {
 	if w == nil {
 		return -1
 	}
-	for index, wCheck := range p.WeaponSet {
+	for index, wCheck := range p.weaponSet {
 		if wCheck == w {
 			return index
 		}
@@ -97,15 +97,15 @@ func (p *Player) getWeaponIndex(w *Weapon) int {
 }
 
 func (p *Player) getSelectedWeapon() (*Weapon, int) {
-	if p.Weapon == nil {
+	if p.weapon == nil {
 		return nil, -1
 	}
 
-	return p.Weapon, p.getWeaponIndex(p.Weapon)
+	return p.weapon, p.getWeaponIndex(p.weapon)
 }
 
 func (p *Player) IsStanding() bool {
-	return p.PositionZ == 0 && p.CameraZ == 0.5
+	return p.PositionZ == 0 && p.cameraZ == 0.5
 }
 
 const (
@@ -115,91 +115,101 @@ const (
 
 func (p *Player) Jump() {
 	if p.IsStanding() {
-		p.VelocityZ = jumpVelocity
-		p.Moved = true
+		p.velocityZ = jumpVelocity
+		p.moved = true
 	}
 
-	p.VelocityZ -= gravity * (1.0 / 60.0) // Assuming 60 FPS
-	p.PositionZ += p.VelocityZ * (1.0 / 60.0)
+	p.velocityZ -= gravity * (1.0 / 60.0) // Assuming 60 FPS
+	p.PositionZ += p.velocityZ * (1.0 / 60.0)
 
 	if p.PositionZ <= 0 {
 		p.PositionZ = 0
-		p.VelocityZ = 0
+		p.velocityZ = 0
 		p.Stand()
 	} else {
-		p.CameraZ = 0.5 + p.PositionZ
+		p.cameraZ = 0.5 + p.PositionZ
 	}
-	p.Moved = true
+	p.moved = true
 }
 
 func (p *Player) applyGravity() {
 	if !p.IsStanding() {
-		p.VelocityZ -= gravity * (1.0 / 60.0)
-		p.PositionZ += p.VelocityZ * (1.0 / 60.0)
+		p.velocityZ -= gravity * (1.0 / 60.0)
+		p.PositionZ += p.velocityZ * (1.0 / 60.0)
 
 		if p.PositionZ <= 0 {
 			p.PositionZ = 0
-			p.VelocityZ = 0
+			p.velocityZ = 0
 			p.Stand()
 		} else {
-			p.CameraZ = 0.5 + p.PositionZ
+			p.cameraZ = 0.5 + p.PositionZ
 		}
-		p.Moved = true
+		p.moved = true
 	}
 }
 
 func (p *Player) Stand() {
-	p.CameraZ = 0.5
+	p.cameraZ = 0.5
 	p.PositionZ = 0
-	p.Moved = true
+	p.moved = true
 }
 
-func (p *Player) updatePitch(pSpeed float64) {
+func (p *Player) updatePitch(pModifier float64) {
+	pSpeed := playerRotateSpeed * pModifier
 	// current raycasting method can only allow up to 22.5 degrees down, 45 degrees up
 	p.Pitch = geom.Clamp(pSpeed+p.Pitch, -math.Pi/8, math.Pi/4)
-	p.Moved = true
+	p.moved = true
 }
 
 func (p *Player) crouch() {
-	p.CameraZ = 0.3
+	p.cameraZ = 0.3
 	p.PositionZ = 0
-	p.Moved = true
+	p.moved = true
 }
 
 func (p *Player) goProne() {
-	p.CameraZ = 0.1
+	p.cameraZ = 0.1
 	p.PositionZ = 0
-	p.Moved = true
+	p.moved = true
 }
 
+const (
+	playerMoveSpeed   = 0.06
+	playerStrafeSpeed = 0.05
+	playerRotateSpeed = 0.005
+)
+
 // move player by move speed in the forward/backward direction
-func (g *Game) move(mSpeed float64) {
+func (g *Game) move(moveModifier float64) {
+	mSpeed := playerMoveSpeed * moveModifier
 	moveLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle, mSpeed)
 
 	newPos, _, _ := g.getValidMove(g.player.Entity, moveLine.X2, moveLine.Y2, g.player.PositionZ, true)
 	if !newPos.Equals(g.player.Pos()) {
 		g.player.Position = newPos
-		g.player.Moved = true
+		g.player.moved = true
 	}
 }
 
 // Move player by strafe speed in the left/right direction
-func (g *Game) strafe(sSpeed float64) {
+func (g *Game) strafe(moveModifier float64) {
+	mSpeed := playerStrafeSpeed * moveModifier
 	strafeAngle := geom.HalfPi
-	if sSpeed < 0 {
+	if mSpeed < 0 {
 		strafeAngle = -strafeAngle
 	}
-	strafeLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle-strafeAngle, math.Abs(sSpeed))
+	strafeLine := geom.LineFromAngle(g.player.Position.X, g.player.Position.Y, g.player.Angle-strafeAngle, math.Abs(mSpeed))
 
 	newPos, _, _ := g.getValidMove(g.player.Entity, strafeLine.X2, strafeLine.Y2, g.player.PositionZ, true)
 	if !newPos.Equals(g.player.Pos()) {
 		g.player.Position = newPos
-		g.player.Moved = true
+		g.player.moved = true
 	}
 }
 
 // rotate player heading angle by rotation speed
-func (p *Player) rotate(rSpeed float64) {
+func (p *Player) rotate(rModifier float64) {
+	rSpeed := playerRotateSpeed * rModifier
 	p.Angle += rSpeed
 
 	for p.Angle > geom.Pi {
@@ -209,5 +219,5 @@ func (p *Player) rotate(rSpeed float64) {
 		p.Angle = p.Angle + geom.Pi2
 	}
 
-	p.Moved = true
+	p.moved = true
 }

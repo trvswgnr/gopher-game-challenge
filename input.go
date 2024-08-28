@@ -8,7 +8,7 @@ import (
 )
 
 func (g *Game) handleInput() {
-	// if p, pause game
+	// p pauses the game
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		if g.paused {
 			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -19,12 +19,13 @@ func (g *Game) handleInput() {
 		}
 	}
 
-	// if escape, exit game
+	// escape exits the game
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		exit(0)
 	}
 
 	if g.paused {
+		// dont process input when paused
 		return
 	}
 
@@ -35,14 +36,7 @@ func (g *Game) handleInput() {
 
 	moveModifier := 1.0
 	if ebiten.IsKeyPressed(ebiten.KeyShift) {
-		moveModifier = 2.0
-	}
-
-	if ebiten.CursorMode() != ebiten.CursorModeCaptured {
-		ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-		// reset initial mouse capture position
-		g.mouseX, g.mouseY = math.MinInt32, math.MinInt32
+		moveModifier = 1.5
 	}
 
 	x, y := ebiten.CursorPosition()
@@ -56,17 +50,16 @@ func (g *Game) handleInput() {
 		if x != 0 && y != 0 {
 			g.mouseX, g.mouseY = x, y
 		}
-
 	} else {
 		dx, dy := g.mouseX-x, g.mouseY-y
 		g.mouseX, g.mouseY = x, y
 
 		if dx != 0 {
-			g.player.rotate(0.005 * float64(dx) * moveModifier)
+			g.player.rotate(float64(dx) * moveModifier)
 		}
 
 		if dy != 0 {
-			g.player.updatePitch(0.005 * float64(dy))
+			g.player.updatePitch(float64(dy))
 		}
 	}
 
@@ -85,17 +78,17 @@ func (g *Game) handleInput() {
 		g.player.SelectWeapon(-1)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyA) || ebiten.IsKeyPressed(ebiten.KeyLeft) {
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		strafeLeft = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) || ebiten.IsKeyPressed(ebiten.KeyRight) {
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		strafeRight = true
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyW) || ebiten.IsKeyPressed(ebiten.KeyUp) {
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		forward = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) || ebiten.IsKeyPressed(ebiten.KeyDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		backward = true
 	}
 
@@ -111,14 +104,14 @@ func (g *Game) handleInput() {
 	}
 
 	if forward {
-		g.move(0.06 * moveModifier)
+		g.move(moveModifier)
 	} else if backward {
-		g.move(-0.06 * moveModifier)
+		g.move(-moveModifier)
 	}
 
 	if strafeLeft {
-		g.strafe(-0.05 * moveModifier)
+		g.strafe(-moveModifier)
 	} else if strafeRight {
-		g.strafe(0.05 * moveModifier)
+		g.strafe(moveModifier)
 	}
 }

@@ -2,30 +2,31 @@ package main
 
 import "github.com/harbdog/raycaster-go/geom"
 
+// a multi-layered map
 type Map struct {
-	worldMap [][]int
-	midMap   [][]int
-	upMap    [][]int
+	bottom [][]int
+	middle [][]int
+	top    [][]int
 }
 
 func (m *Map) NumLevels() int {
 	return 4
 }
 
-func (m *Map) Level(levelNum int) [][]int {
-	if levelNum == 0 {
-		return m.worldMap
-	} else if levelNum == 1 {
-		return m.midMap
+func (m *Map) Level(level int) [][]int {
+	if level == 0 {
+		return m.bottom
+	} else if level == 1 {
+		return m.middle
 	} else {
-		return m.upMap // if above highest level just keep extending last one up
+		return m.top // if above highest level just keep extending last one up
 	}
 }
 
 func NewMap() *Map {
 	m := &Map{}
 
-	m.worldMap = [][]int{
+	m.bottom = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -52,7 +53,7 @@ func NewMap() *Map {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	}
 
-	m.midMap = [][]int{
+	m.middle = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -79,7 +80,7 @@ func NewMap() *Map {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	}
 
-	m.upMap = [][]int{
+	m.top = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -110,14 +111,14 @@ func NewMap() *Map {
 }
 
 func (m *Map) GetCollisionLines(clipDistance float64) []geom.Line {
-	if len(m.worldMap) == 0 || len(m.worldMap[0]) == 0 {
+	if len(m.bottom) == 0 || len(m.bottom[0]) == 0 {
 		return []geom.Line{}
 	}
 
 	lines := geom.Rect(clipDistance, clipDistance,
-		float64(len(m.worldMap))-2*clipDistance, float64(len(m.worldMap[0]))-2*clipDistance)
+		float64(len(m.bottom))-2*clipDistance, float64(len(m.bottom[0]))-2*clipDistance)
 
-	for x, row := range m.worldMap {
+	for x, row := range m.bottom {
 		for y, value := range row {
 			if value > 0 {
 				lines = append(lines, geom.Rect(float64(x)-clipDistance, float64(y)-clipDistance,

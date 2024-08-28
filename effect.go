@@ -9,7 +9,7 @@ import (
 
 type Effect struct {
 	*SpriteInstance
-	LoopCount int
+	loopCount int
 }
 
 func NewEffect(
@@ -18,7 +18,7 @@ func NewEffect(
 	mapColor := color.RGBA{0, 0, 0, 0}
 	e := &Effect{
 		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, 0, 0),
-		LoopCount:      loopCount,
+		loopCount:      loopCount,
 	}
 
 	// effects should not be convergence capable by player focal point
