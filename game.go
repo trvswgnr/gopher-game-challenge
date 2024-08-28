@@ -39,10 +39,10 @@ type Game struct {
 	renderScale  float64
 	fullscreen   bool
 	vsync        bool
-	fsr          float64
-	opengl       bool
-	fovDegrees   float64
-	fovDepth     float64
+
+	opengl     bool
+	fovDegrees float64
+	fovDepth   float64
 
 	//--viewport width / height--//
 	width  int
@@ -98,7 +98,6 @@ func NewGame() *Game {
 		renderScale:        1.0,
 		fullscreen:         false,
 		vsync:              true,
-		fsr:                4.0,
 		opengl:             true,
 		renderDistance:     -1,
 		initRenderFloorTex: true,
@@ -299,23 +298,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// draw raycasted scene
 	op := &ebiten.DrawImageOptions{}
-	if g.fsr > 1 {
-		fsrImage := DrawFSR(g.scene, g.fsr)
-		fsrWidth, fsrHeight := fsrImage.Bounds().Dx(), fsrImage.Bounds().Dy()
-		if g.screenWidth != fsrWidth || g.screenHeight != fsrHeight {
-			op.GeoM.Scale(
-				float64(g.screenWidth)/float64(fsrWidth),
-				float64(g.screenHeight)/float64(fsrHeight),
-			)
-		}
-		screen.DrawImage(fsrImage, op)
-	} else {
-		if g.renderScale != 1.0 {
-			op.Filter = ebiten.FilterNearest
-			op.GeoM.Scale(1/g.renderScale, 1/g.renderScale)
-		}
-		screen.DrawImage(g.scene, op)
+	if g.renderScale != 1.0 {
+		op.Filter = ebiten.FilterNearest
+		op.GeoM.Scale(1/g.renderScale, 1/g.renderScale)
 	}
+	screen.DrawImage(g.scene, op)
 
 	// draw minimap
 	mm := g.miniMap()
