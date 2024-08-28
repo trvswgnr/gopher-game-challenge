@@ -14,7 +14,7 @@ import (
 // -- resources
 
 //go:embed resources
-var embedded embed.FS
+var resources embed.FS
 
 // loadContent will be called once per game and is the place to load
 // all of your content.
@@ -49,7 +49,7 @@ func (g *Game) loadContent() {
 	g.tex.textures[24] = getSpriteFromFile("bat_sheet.png")
 
 	// just setting the grass texture apart from the rest since it gets special handling
-	if g.debug {
+	if DEBUG_ENABLED {
 		g.tex.floorTex = getRGBAFromFile("grass_debug.png")
 	} else {
 		g.tex.floorTex = getRGBAFromFile("grass.png")
@@ -57,7 +57,7 @@ func (g *Game) loadContent() {
 }
 
 func newImageFromFile(path string) (*ebiten.Image, image.Image, error) {
-	f, err := embedded.Open(filepath.ToSlash(path))
+	f, err := resources.Open(filepath.ToSlash(path))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -120,19 +120,20 @@ func (g *Game) loadSprites() {
 	chargedBoltWidth := chargedBoltImg.Bounds().Dx()
 	chargedBoltCols, chargedBoltRows := 6, 1
 	chargedBoltScale := 0.3
-	// in pixels, radius to use for collision testing
+	// in pixels, radius to use for collision checking
 	chargedBoltPxRadius := 50.0
 	chargedBoltCollisionRadius := (chargedBoltScale * chargedBoltPxRadius) / (float64(chargedBoltWidth) / float64(chargedBoltCols))
 	chargedBoltCollisionHeight := 2 * chargedBoltCollisionRadius
 	chargedBoltProjectile := NewAnimatedProjectile(
 		0, 0, chargedBoltScale, 1, chargedBoltImg, blueish,
 		chargedBoltCols, chargedBoltRows, AnchorCenter, chargedBoltCollisionRadius, chargedBoltCollisionHeight,
+		0,
 	)
 
 	redBoltImg := g.tex.textures[22]
 	redBoltWidth := redBoltImg.Bounds().Dx()
 	redBoltScale := 0.25
-	// in pixels, radius to use for collision testing
+	// in pixels, radius to use for collision checking
 	redBoltPxRadius := 4.0
 	redBoltCollisionRadius := (redBoltScale * redBoltPxRadius) / float64(redBoltWidth)
 	redBoltCollisionHeight := 2 * redBoltCollisionRadius
@@ -145,12 +146,12 @@ func (g *Game) loadSprites() {
 	blueExplosionEffect := NewEffect(
 		0, 0, 0.75, 3, g.tex.textures[18], 5, 3, AnchorCenter, 1,
 	)
-	chargedBoltProjectile.ImpactEffect = *blueExplosionEffect
+	chargedBoltProjectile.impactEffect = *blueExplosionEffect
 
 	redExplosionEffect := NewEffect(
 		0, 0, 0.20, 1, g.tex.textures[23], 8, 3, AnchorCenter, 1,
 	)
-	redBoltProjectile.ImpactEffect = *redExplosionEffect
+	redBoltProjectile.impactEffect = *redExplosionEffect
 
 	// create weapons
 	chargedBoltRoF := 2.5      // Rate of Fire (as RoF/second)
@@ -177,8 +178,8 @@ func (g *Game) loadSprites() {
 		22.5, 11.75, sorcScale, 5, sorcImg, yellow, sorcCols, sorcRows, AnchorBottom, sorcCollisionRadius, sorcCollisionHeight,
 	)
 	// give sprite a sample velocity for movement
-	sorc.Angle = radians(180)
-	sorc.Velocity = 0.02
+	sorc.angle = radians(180)
+	sorc.velocity = 0.02
 	g.addSprite(sorc)
 
 	// animated walking 8-directional sprite character
@@ -208,8 +209,8 @@ func (g *Game) loadSprites() {
 	walker.SetAnimationReversed(true) // this sprite sheet has reversed animation frame order
 	walker.SetTextureFacingMap(walkerTexFacingMap)
 	// give sprite a sample velocity for movement
-	walker.Angle = radians(0)
-	walker.Velocity = 0.02
+	walker.angle = radians(0)
+	walker.velocity = 0.02
 	g.addSprite(walker)
 
 	// animated flying 4-directional sprite creature
@@ -234,13 +235,13 @@ func (g *Game) loadSprites() {
 	)
 	batty.SetTextureFacingMap(batTexFacingMap)
 	// raising Z-position of sprite model but using AnchorTop to show below that position
-	batty.PositionZ = 1.0
+	batty.posZ = 1.0
 	// give sprite a sample velocity for movement
-	batty.Angle = radians(150)
-	batty.Velocity = 0.03
+	batty.angle = radians(150)
+	batty.velocity = 0.03
 	g.addSprite(batty)
 
-	if g.debug {
+	if DEBUG_ENABLED {
 		// just some debugging stuff
 		sorc.AddDebugLines(2, color.RGBA{0, 255, 0, 255})
 		walker.AddDebugLines(2, color.RGBA{0, 255, 0, 255})

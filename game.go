@@ -11,6 +11,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
+var DEBUG_ENABLED = false
+var DEBUG_SHOW_SPRITE_BOXES = DEBUG_ENABLED
+
 // -- game
 
 const (
@@ -35,16 +38,14 @@ type Game struct {
 	screenWidth  int
 	screenHeight int
 	renderScale  float64
+	renderWidth  int
+	renderHeight int
 	fullscreen   bool
 	vsync        bool
 
 	opengl     bool
 	fovDegrees float64
 	fovDepth   float64
-
-	//--viewport width / height--//
-	width  int
-	height int
 
 	player *Player
 
@@ -59,14 +60,6 @@ type Game struct {
 	// zoom settings
 	zoomFovDepth float64
 
-	renderDistance float64
-
-	// lighting settings
-	lightFalloff       float64
-	globalIllumination float64
-	minLightRGB        *color.NRGBA
-	maxLightRGB        *color.NRGBA
-
 	//--array of levels, levels refer to "floors" of the world--//
 	mapObj       *Map
 	collisionMap []Line
@@ -76,9 +69,6 @@ type Game struct {
 	effects     map[*Effect]struct{}
 
 	mapWidth, mapHeight int
-
-	showSpriteBoxes bool
-	debug           bool
 }
 
 // NewGame - Allows the game to perform any initialization it needs to before starting to run.
@@ -97,10 +87,7 @@ func NewGame() *Game {
 		fullscreen:         false,
 		vsync:              true,
 		opengl:             true,
-		renderDistance:     -1,
 		initRenderFloorTex: true,
-		showSpriteBoxes:    false,
-		debug:              false,
 	}
 
 	ebiten.SetWindowTitle("Office Escape")
@@ -113,10 +100,10 @@ func NewGame() *Game {
 	}
 
 	// use scale to keep the desired window width and height
-	g.setResolution(g.screenWidth, g.screenHeight)
-	g.setRenderScale(g.renderScale)
-	g.setFullscreen(g.fullscreen)
-	g.setVsyncEnabled(g.vsync)
+	ebiten.SetWindowSize(1024, 768)
+	g.setRenderScale(1.0)
+	ebiten.SetFullscreen(false)
+	ebiten.SetVsyncEnabled(true)
 
 	// load map
 	g.mapObj = NewMap()
@@ -139,8 +126,8 @@ func NewGame() *Game {
 	// init player model
 	angleDegrees := 60.0
 	g.player = NewPlayer(8.5, 3.5, radians(angleDegrees), 0)
-	g.player.CollisionRadius = clipDistance
-	g.player.CollisionHeight = 0.5
+	g.player.collisionRadius = clipDistance
+	g.player.collisionHeight = 0.5
 
 	// init the sprites
 	g.loadSprites()
@@ -150,25 +137,25 @@ func NewGame() *Game {
 	g.mouseX, g.mouseY = math.MinInt32, math.MinInt32
 
 	//--init camera and renderer--//
-	g.camera = NewCamera(g.width, g.height, texWidth, g.mapObj, g.tex)
-	g.setRenderDistance(g.renderDistance)
+	g.camera = NewCamera(g.renderWidth, g.renderHeight, texWidth, g.mapObj, g.tex)
+	g.camera.setRenderDistance(-1)
 
-	g.camera.SetFloorTexture(getTextureFromFile("floor.png"))
-	g.camera.SetSkyTexture(getTextureFromFile("sky.png"))
+	g.camera.setFloor(getTextureFromFile("floor.png"))
+	g.camera.setSky(getTextureFromFile("sky.png"))
 
 	// initialize camera to player position
-	g.updatePlayerCamera(true)
-	g.setFovAngle(g.fovDegrees)
-	g.fovDepth = g.camera.FovDepth()
+	g.initializePlayerCamera()
+	g.camera.setFovRadians(g.fovDegrees, 1.0)
+	g.fovDepth = g.camera.getFovDepth()
 
 	g.zoomFovDepth = 2.0
 
 	// set demo lighting settings
-	g.setLightFalloff(-200)
-	g.setGlobalIllumination(500)
+	g.camera.setLightFalloff(-200)
+	g.camera.setGlobalIllumination(500)
 	minLightRGB := &color.NRGBA{R: 76, G: 76, B: 76, A: 255}
 	maxLightRGB := &color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-	g.setLightRGB(minLightRGB, maxLightRGB)
+	g.camera.setLightRGB(*minLightRGB, *maxLightRGB)
 
 	return g
 }
@@ -205,7 +192,7 @@ func (g *Game) Update() error {
 		g.updateSprites()
 
 		// handle player camera movement
-		g.updatePlayerCamera(false)
+		g.updatePlayerCamera()
 	}
 
 	return nil
@@ -255,31 +242,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			drawScale = (float64(compSize) / 3) / float64(w.h)
 		}
 
-		weaponScale := w.Scale() * drawScale * g.renderScale
+		weaponScale := w.getScale() * drawScale * g.renderScale
 		op.GeoM.Scale(weaponScale, weaponScale)
 		op.GeoM.Translate(
-			float64(g.width)/2-float64(w.w)*weaponScale/2,
-			float64(g.height)-float64(w.h)*weaponScale+1,
+			float64(g.renderWidth)/2-float64(w.w)*weaponScale/2,
+			float64(g.renderHeight)-float64(w.h)*weaponScale+1,
 		)
 
 		// apply lighting setting
-		op.ColorScale.Scale(float32(g.maxLightRGB.R)/255, float32(g.maxLightRGB.G)/255, float32(g.maxLightRGB.B)/255, 1)
+		op.ColorScale.Scale(float32(g.camera.maxLightRGB.R)/255, float32(g.camera.maxLightRGB.G)/255, float32(g.camera.maxLightRGB.B)/255, 1)
 
 		g.scene.DrawImage(w.Texture(), op)
 	}
 
-	if g.showSpriteBoxes {
+	if DEBUG_SHOW_SPRITE_BOXES {
 		// draw sprite screen indicators to show we know where it was raycasted (must occur after camera.Update)
 		for sprite := range g.sprites {
-			drawSpriteBox(g.scene, sprite)
+			sprite.drawSpriteBox(g.scene)
 		}
 
 		for sprite := range g.projectiles {
-			drawSpriteBox(g.scene, sprite.Sprite)
+			sprite.drawSpriteBox(g.scene)
 		}
 
 		for sprite := range g.effects {
-			drawSpriteBox(g.scene, sprite.Sprite)
+			sprite.drawSpriteBox(g.scene)
 		}
 	}
 
@@ -288,7 +275,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if convergenceSprite != nil {
 		for sprite := range g.sprites {
 			if convergenceSprite == sprite {
-				drawSpriteIndicator(g.scene, sprite)
+				sprite.drawSpriteIndicator(g.scene)
 				break
 			}
 		}
@@ -319,7 +306,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op := &ebiten.DrawImageOptions{}
 		op.Filter = ebiten.FilterNearest
 
-		crosshairScale := g.crosshairs.Scale()
+		crosshairScale := g.crosshairs.getScale()
 		op.GeoM.Scale(crosshairScale, crosshairScale)
 		op.GeoM.Translate(
 			float64(g.screenWidth)/2-float64(g.crosshairs.w)*crosshairScale/2,
@@ -327,7 +314,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 		screen.DrawImage(g.crosshairs.Texture(), op)
 
-		if g.crosshairs.IsHitIndicatorActive() {
+		if g.crosshairs.isHitIndicatorActive() {
 			screen.DrawImage(g.crosshairs.HitIndicator.Texture(), op)
 			g.crosshairs.Update()
 		}
@@ -341,21 +328,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 func (g *Game) updateSprites() {
 	// Testing animated sprite movement
 	for s := range g.sprites {
-		if s.Velocity != 0 {
-			vLine := lineFromAngle(s.Position.X, s.Position.Y, s.Angle, s.Velocity)
+		if s.velocity != 0 {
+			vLine := lineFromAngle(s.pos.X, s.pos.Y, s.angle, s.velocity)
 
 			xCheck := vLine.X2
 			yCheck := vLine.Y2
-			zCheck := s.PositionZ
+			zCheck := s.posZ
 
 			newPos, isCollision, _ := g.getValidMove(s.Entity, xCheck, yCheck, zCheck, false)
 			if isCollision {
-				s.Angle = randFloat(-math.Pi, math.Pi)
-				s.Velocity = randFloat(0.01, 0.03)
+				s.angle = randFloat(-math.Pi, math.Pi)
+				s.velocity = randFloat(0.01, 0.03)
 			} else {
-				s.Position = newPos
+				s.pos = newPos
 			}
 		}
-		s.Update(g.player.Position)
+		s.Update(g.player.pos)
 	}
+}
+
+func (g *Game) setRenderScale(renderScale float64) {
+	g.renderScale = renderScale
+	g.renderWidth = int(math.Floor(float64(g.screenWidth) * g.renderScale))
+	g.renderHeight = int(math.Floor(float64(g.screenHeight) * g.renderScale))
+	if g.camera != nil {
+		g.camera.setViewSize(g.renderWidth, g.renderHeight)
+	}
+	g.scene = ebiten.NewImage(g.renderWidth, g.renderHeight)
 }

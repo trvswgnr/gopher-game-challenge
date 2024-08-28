@@ -8,6 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // -- sprite
@@ -56,12 +57,12 @@ type Sprite struct {
 	screenRect     *image.Rectangle
 }
 
-func (s *Sprite) Scale() float64 {
-	return s.Entity.Scale
+func (s *Sprite) getScale() float64 {
+	return s.Entity.scale
 }
 
-func (s *Sprite) VerticalAnchor() SpriteAnchor {
-	return s.Entity.Anchor
+func (s *Sprite) getVerticalAnchor() SpriteAnchor {
+	return s.Entity.verticalAnchor
 }
 
 func (s *Sprite) Texture() *ebiten.Image {
@@ -90,15 +91,15 @@ func NewSprite(
 ) *Sprite {
 	s := &Sprite{
 		Entity: &Entity{
-			Position:        &Vec2{X: x, Y: y},
-			PositionZ:       0,
-			Scale:           scale,
-			Anchor:          anchor,
-			Angle:           0,
-			Velocity:        0,
-			CollisionRadius: collisionRadius,
-			CollisionHeight: collisionHeight,
-			MapColor:        mapColor,
+			pos:             &Vec2{X: x, Y: y},
+			posZ:            0,
+			scale:           scale,
+			verticalAnchor:  anchor,
+			angle:           0,
+			velocity:        0,
+			collisionRadius: collisionRadius,
+			collisionHeight: collisionHeight,
+			mapColor:        mapColor,
 		},
 		isFocusable: true,
 	}
@@ -121,15 +122,15 @@ func NewSpriteFromSheet(
 ) *Sprite {
 	s := &Sprite{
 		Entity: &Entity{
-			Position:        &Vec2{X: x, Y: y},
-			PositionZ:       0,
-			Scale:           scale,
-			Anchor:          anchor,
-			Angle:           0,
-			Velocity:        0,
-			CollisionRadius: collisionRadius,
-			CollisionHeight: collisionHeight,
-			MapColor:        mapColor,
+			pos:             &Vec2{X: x, Y: y},
+			posZ:            0,
+			scale:           scale,
+			verticalAnchor:  anchor,
+			angle:           0,
+			velocity:        0,
+			collisionRadius: collisionRadius,
+			collisionHeight: collisionHeight,
+			mapColor:        mapColor,
 		},
 		isFocusable: true,
 	}
@@ -168,15 +169,15 @@ func NewAnimatedSprite(
 ) *Sprite {
 	s := &Sprite{
 		Entity: &Entity{
-			Position:        &Vec2{X: x, Y: y},
-			PositionZ:       0,
-			Scale:           scale,
-			Anchor:          anchor,
-			Angle:           0,
-			Velocity:        0,
-			CollisionRadius: collisionRadius,
-			CollisionHeight: collisionHeight,
-			MapColor:        mapColor,
+			pos:             &Vec2{X: x, Y: y},
+			posZ:            0,
+			scale:           scale,
+			verticalAnchor:  anchor,
+			angle:           0,
+			velocity:        0,
+			collisionRadius: collisionRadius,
+			collisionHeight: collisionHeight,
+			mapColor:        mapColor,
 		},
 		isFocusable: true,
 	}
@@ -281,8 +282,8 @@ func (s *Sprite) Update(camPos *Vec2) {
 			texRow := 0
 
 			// calculate angle from sprite relative to camera position by getting angle of line between them
-			lineToCam := Line{X1: s.Position.X, Y1: s.Position.Y, X2: camPos.X, Y2: camPos.Y}
-			facingAngle := lineToCam.angle() - s.Angle
+			lineToCam := Line{X1: s.pos.X, Y1: s.pos.Y, X2: camPos.X, Y2: camPos.Y}
+			facingAngle := lineToCam.angle() - s.angle
 			if facingAngle < 0 {
 				// convert to positive angle needed to determine facing index to use
 				facingAngle += Pi2
@@ -320,7 +321,7 @@ func (s *Sprite) AddDebugLines(lineWidth int, clr color.Color) {
 	lW := float64(lineWidth)
 	sW := float64(s.w)
 	sH := float64(s.h)
-	sCr := s.CollisionRadius * sW
+	sCr := s.collisionRadius * sW
 
 	for i, img := range s.textures {
 		imgRect := s.texRects[i]
@@ -337,9 +338,35 @@ func (s *Sprite) AddDebugLines(lineWidth int, clr color.Color) {
 		ebitenutil.DrawRect(img, x, y+sH/2-lW/2-1, sW, lW, clr)
 
 		// collision markers
-		if s.CollisionRadius > 0 {
+		if s.collisionRadius > 0 {
 			ebitenutil.DrawRect(img, x+sW/2-sCr-lW/2-1, y, lW, sH, color.White)
 			ebitenutil.DrawRect(img, x+sW/2+sCr-lW/2-1, y, lW, sH, color.White)
 		}
 	}
+}
+
+func (sprite *Sprite) drawSpriteBox(screen *ebiten.Image) {
+	r := sprite.ScreenRect()
+	if r == nil {
+		return
+	}
+
+	minX, minY := float32(r.Min.X), float32(r.Min.Y)
+	maxX, maxY := float32(r.Max.X), float32(r.Max.Y)
+
+	vector.StrokeRect(screen, minX, minY, maxX-minX, maxY-minY, 1, color.RGBA{255, 0, 0, 255}, false)
+}
+
+func (s *Sprite) drawSpriteIndicator(screen *ebiten.Image) {
+	r := s.ScreenRect()
+	if r == nil {
+		return
+	}
+
+	dX, dY := float32(r.Dx())/8, float32(r.Dy())/8
+	midX, minY := float32(r.Max.X)-float32(r.Dx())/2, float32(r.Min.Y)-dY
+
+	vector.StrokeLine(screen, midX, minY+dY, midX-dX, minY, 1, color.RGBA{0, 255, 0, 255}, false)
+	vector.StrokeLine(screen, midX, minY+dY, midX+dX, minY, 1, color.RGBA{0, 255, 0, 255}, false)
+	vector.StrokeLine(screen, midX-dX, minY, midX+dX, minY, 1, color.RGBA{0, 255, 0, 255}, false)
 }

@@ -64,15 +64,15 @@ func (g *Game) miniMap() *image.RGBA {
 		sprites = append(sprites, s.Entity)
 	}
 	sort.Slice(sprites, func(i, j int) bool {
-		iComp := (sprites[i].MapColor.R + sprites[i].MapColor.G + sprites[i].MapColor.B)
-		jComp := (sprites[j].MapColor.R + sprites[j].MapColor.G + sprites[j].MapColor.B)
+		iComp := (sprites[i].mapColor.R + sprites[i].mapColor.G + sprites[i].mapColor.B)
+		jComp := (sprites[j].mapColor.R + sprites[j].mapColor.G + sprites[j].mapColor.B)
 		return iComp < jComp
 	})
 
 	for _, sprite := range sprites {
-		if sprite.MapColor.A > 0 {
+		if sprite.mapColor.A > 0 {
 
-			m.Set(int(sprite.Position.X), int(sprite.Position.Y), sprite.MapColor)
+			m.Set(int(sprite.pos.X), int(sprite.pos.Y), sprite.mapColor)
 		}
 	}
 
@@ -82,20 +82,20 @@ func (g *Game) miniMap() *image.RGBA {
 		projectiles = append(projectiles, p.Entity)
 	}
 	sort.Slice(projectiles, func(i, j int) bool {
-		iComp := (projectiles[i].MapColor.R + projectiles[i].MapColor.G + projectiles[i].MapColor.B)
-		jComp := (projectiles[j].MapColor.R + projectiles[j].MapColor.G + projectiles[j].MapColor.B)
+		iComp := (projectiles[i].mapColor.R + projectiles[i].mapColor.G + projectiles[i].mapColor.B)
+		jComp := (projectiles[j].mapColor.R + projectiles[j].mapColor.G + projectiles[j].mapColor.B)
 		return iComp < jComp
 	})
 
 	for _, projectile := range projectiles {
-		if projectile.MapColor.A > 0 {
+		if projectile.mapColor.A > 0 {
 
-			m.Set(int(projectile.Position.X), int(projectile.Position.Y), projectile.MapColor)
+			m.Set(int(projectile.pos.X), int(projectile.pos.Y), projectile.mapColor)
 		}
 	}
 
 	// player position
-	m.Set(int(g.player.Position.X), int(g.player.Position.Y), g.player.MapColor)
+	m.Set(int(g.player.pos.X), int(g.player.pos.Y), g.player.mapColor)
 
 	return m
 }

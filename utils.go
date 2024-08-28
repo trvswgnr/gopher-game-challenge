@@ -115,6 +115,10 @@ func (l *Line) angle() float64 {
 	return math.Atan2(l.Y2-l.Y1, l.X2-l.X1)
 }
 
+func getAngleFromVec(dir *Vec2) float64 {
+	return math.Atan2(dir.Y, dir.X)
+}
+
 // dist gets the distance between the two endpoints of the line
 func (l *Line) dist() float64 {
 	return getDistance(l.X1, l.Y1, l.X2, l.Y2)
@@ -131,12 +135,12 @@ func distSquared(x1, y1, x2, y2 float64) float64 {
 }
 
 // lineFromAngle creates a line from a starting point at a given angle and length
-func lineFromAngle(x, y, angle, length float64) Line {
+func lineFromAngle(x, y, angleRadians, length float64) Line {
 	return Line{
 		X1: x,
 		Y1: y,
-		X2: x + (length * math.Cos(angle)),
-		Y2: y + (length * math.Sin(angle)),
+		X2: x + (length * math.Cos(angleRadians)),
+		Y2: y + (length * math.Sin(angleRadians)),
 	}
 }
 
@@ -371,5 +375,29 @@ func line3dFromBaseAngle(x, y, z, heading, pitch, xyLength float64) Line3d {
 		X2: x + (xyLength * math.Cos(heading)),
 		Y2: y + (xyLength * math.Sin(heading)),
 		Z2: z + (xyLength * math.Tan(pitch)),
+	}
+}
+
+// comb sort
+func combSort(order []int, dist []float64, amount int) {
+	gap := amount
+	swapped := false
+	for gap > 1 || swapped {
+		gap = (gap * 10) / 13
+		if gap == 9 || gap == 10 {
+			gap = 11
+		}
+		if gap < 1 {
+			gap = 1
+		}
+		swapped = false
+		for i := 0; i < amount-gap; i++ {
+			j := i + gap
+			if dist[i] < dist[j] {
+				dist[i], dist[j] = dist[j], dist[i]
+				order[i], order[j] = order[j], order[i]
+				swapped = true
+			}
+		}
 	}
 }

@@ -7,73 +7,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// -- projectile
-
-type Projectile struct {
-	*Sprite
-	Ricochets    int
-	Lifespan     float64
-	ImpactEffect Effect
-	Gravity      float64
-}
-
-func NewProjectile(
-	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
-	anchor SpriteAnchor, collisionRadius, collisionHeight, gravity float64,
-) *Projectile {
-	p := &Projectile{
-		Sprite:       NewSprite(x, y, scale, img, mapColor, anchor, collisionRadius, collisionHeight),
-		Ricochets:    0,
-		Lifespan:     math.MaxFloat64,
-		ImpactEffect: Effect{},
-		Gravity:      gravity,
-	}
-
-	// projectiles should not be convergence capable by player focal point
-	p.isFocusable = false
-
-	// projectiles self illuminate so they do not get dimmed in dark conditions
-	p.illumination = 5000
-
-	return p
-}
-
-func NewAnimatedProjectile(
-	x, y, scale float64, animationRate int, img *ebiten.Image, mapColor color.RGBA, columns, rows int,
-	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
-) *Projectile {
-	p := &Projectile{
-		Sprite:       NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, collisionRadius, collisionHeight),
-		Ricochets:    0,
-		Lifespan:     math.MaxFloat64,
-		ImpactEffect: Effect{},
-	}
-
-	// projectiles should not be convergence capable by player focal point
-	p.isFocusable = false
-
-	// projectiles self illuminate so they do not get dimmed in dark conditions
-	p.illumination = 5000
-
-	return p
-}
-
-func (p *Projectile) SpawnEffect(x, y, z, angle, pitch float64) *Effect {
-	impactEffect := clone(&p.ImpactEffect)
-	spriteInstance := clone(p.ImpactEffect.Sprite)
-
-	impactEffect.Sprite = spriteInstance
-	impactEffect.Position = &Vec2{X: x, Y: y}
-	impactEffect.PositionZ = z
-	impactEffect.Angle = angle
-	impactEffect.Pitch = pitch
-
-	// keep track of what spawned it
-	impactEffect.Parent = p.Parent
-
-	return impactEffect
-}
-
 // -- weapon
 
 type Weapon struct {
@@ -119,16 +52,16 @@ func (w *Weapon) SpawnProjectile(x, y, z, angle, pitch float64, spawnedBy *Entit
 	s := clone(w.projectile.Sprite)
 
 	p.Sprite = s
-	p.Position = &Vec2{X: x, Y: y}
-	p.PositionZ = z
-	p.Angle = angle
-	p.Pitch = pitch
+	p.pos = &Vec2{X: x, Y: y}
+	p.posZ = z
+	p.angle = angle
+	p.pitch = pitch
 
 	// convert velocity from distance/second to distance per tick
-	p.Velocity = w.projectileVelocity / float64(ebiten.TPS())
+	p.velocity = w.projectileVelocity / float64(ebiten.TPS())
 
 	// keep track of what spawned it
-	p.Parent = spawnedBy
+	p.parent = spawnedBy
 
 	return p
 }
@@ -167,13 +100,13 @@ func (g *Game) fireWeapon() {
 	w.Fire()
 
 	// spawning projectile at player position just slightly below player's center point of view
-	pX, pY, pZ := g.player.Position.X, g.player.Position.Y, clamp(g.player.cameraZ-0.1, 0.05, 0.95)
+	pX, pY, pZ := g.player.pos.X, g.player.pos.Y, clamp(g.player.cameraZ-0.1, 0.05, 0.95)
 	// pitch, angle based on raycasted point at crosshairs
 	var pAngle, pPitch float64
 	convergenceDistance := g.camera.GetConvergenceDistance()
 	convergencePoint := g.camera.GetConvergencePoint()
 	if convergenceDistance <= 0 || convergencePoint == nil {
-		pAngle, pPitch = g.player.Angle, g.player.Pitch
+		pAngle, pPitch = g.player.angle, g.player.pitch
 	} else {
 		convergenceLine3d := &Line3d{
 			X1: pX, Y1: pY, Z1: pZ,
@@ -190,30 +123,30 @@ func (g *Game) fireWeapon() {
 
 func (g *Game) updateProjectiles() {
 	for p := range g.projectiles {
-		if p.Velocity != 0 {
+		if p.velocity != 0 {
 
-			trajectory := line3dFromAngle(p.Position.X, p.Position.Y, p.PositionZ, p.Angle, p.Pitch, p.Velocity)
+			trajectory := line3dFromAngle(p.pos.X, p.pos.Y, p.posZ, p.angle, p.pitch, p.velocity)
 
 			xCheck := trajectory.X2
 			yCheck := trajectory.Y2
 			zCheck := trajectory.Z2
 
-			zCheck -= p.Gravity
+			zCheck -= p.gravity
 
 			newPos, isCollision, collisions := g.getValidMove(p.Entity, xCheck, yCheck, zCheck, false)
-			if isCollision || p.PositionZ <= 0 {
+			if isCollision || p.posZ <= 0 {
 				// for testing purposes, projectiles instantly get deleted when collision occurs
 				g.deleteProjectile(p)
 
 				// make a sprite/wall getting hit by projectile cause some visual effect
-				if p.ImpactEffect.Sprite != nil {
+				if p.impactEffect.Sprite != nil {
 					if len(collisions) >= 1 {
 						// use the first collision point to place effect at
 						newPos = collisions[0].collision
 					}
 
 					// TODO: give impact effect optional ability to have some velocity based on the projectile movement upon impact if it didn't hit a wall
-					effect := p.SpawnEffect(newPos.X, newPos.Y, p.PositionZ, p.Angle, p.Pitch)
+					effect := p.spawnEffect(newPos.X, newPos.Y, p.posZ, p.angle, p.pitch)
 
 					g.addEffect(effect)
 				}
@@ -223,28 +156,28 @@ func (g *Game) updateProjectiles() {
 						println("ouch!")
 					} else {
 						// show crosshair hit effect
-						g.crosshairs.ActivateHitIndicator(30)
+						g.crosshairs.activateHitIndicator(30)
 					}
 				}
 			} else {
-				p.Position = newPos
-				p.PositionZ = zCheck
+				p.pos = newPos
+				p.posZ = zCheck
 
 				// Update pitch due to gravity
-				if p.Gravity != 0 {
-					dx := p.Position.X - trajectory.X1
-					dy := p.Position.Y - trajectory.Y1
-					dz := p.PositionZ - trajectory.Z1
-					p.Pitch = math.Atan2(dz, math.Sqrt(dx*dx+dy*dy))
+				if p.gravity != 0 {
+					dx := p.pos.X - trajectory.X1
+					dy := p.pos.Y - trajectory.Y1
+					dz := p.posZ - trajectory.Z1
+					p.pitch = math.Atan2(dz, math.Sqrt(dx*dx+dy*dy))
 				}
 			}
 		}
-		p.Update(g.player.Position)
+		p.Update(g.player.pos)
 	}
 
 	// Testing animated effects (explosions)
 	for e := range g.effects {
-		e.Update(g.player.Position)
+		e.Update(g.player.pos)
 		if e.LoopCounter() >= e.loopCount {
 			g.deleteEffect(e)
 		}
