@@ -103,7 +103,7 @@ func getSpriteFromFile(sFile string) *ebiten.Image {
 func (g *Game) loadSprites() {
 	g.projectiles = make(map[*Projectile]struct{}, 1024)
 	g.effects = make(map[*Effect]struct{}, 1024)
-	g.sprites = make(map[*SpriteInstance]struct{}, 128)
+	g.sprites = make(map[*Sprite]struct{}, 128)
 
 	// colors for minimap representation
 	blueish := color.RGBA{62, 62, 100, 96}
@@ -317,7 +317,7 @@ func (g *Game) loadSprites() {
 	g.addSprite(NewSprite(13.5, 8, 1.0, g.tex.textures[14], orange, AnchorBottom, 0, 0))
 }
 
-func (g *Game) addSprite(sprite *SpriteInstance) {
+func (g *Game) addSprite(sprite *Sprite) {
 	g.sprites[sprite] = struct{}{}
 }
 

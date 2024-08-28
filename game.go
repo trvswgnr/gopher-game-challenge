@@ -73,7 +73,7 @@ type Game struct {
 	mapObj       *MapInstance
 	collisionMap []Line
 
-	sprites     map[*SpriteInstance]struct{}
+	sprites     map[*Sprite]struct{}
 	projectiles map[*Projectile]struct{}
 	effects     map[*Effect]struct{}
 
@@ -219,18 +219,18 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Put projectiles together with sprites for raycasting both as sprites
 	numSprites, numProjectiles, numEffects := len(g.sprites), len(g.projectiles), len(g.effects)
-	raycastSprites := make([]Sprite, numSprites+numProjectiles+numEffects)
+	raycastSprites := make([]*Sprite, numSprites+numProjectiles+numEffects)
 	index := 0
 	for sprite := range g.sprites {
 		raycastSprites[index] = sprite
 		index += 1
 	}
 	for projectile := range g.projectiles {
-		raycastSprites[index] = projectile.SpriteInstance
+		raycastSprites[index] = projectile.Sprite
 		index += 1
 	}
 	for effect := range g.effects {
-		raycastSprites[index] = effect.SpriteInstance
+		raycastSprites[index] = effect.Sprite
 		index += 1
 	}
 
@@ -278,11 +278,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 
 		for sprite := range g.projectiles {
-			drawSpriteBox(g.scene, sprite.SpriteInstance)
+			drawSpriteBox(g.scene, sprite.Sprite)
 		}
 
 		for sprite := range g.effects {
-			drawSpriteBox(g.scene, sprite.SpriteInstance)
+			drawSpriteBox(g.scene, sprite.Sprite)
 		}
 	}
 
@@ -353,7 +353,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fps)
 }
 
-func drawSpriteBox(screen *ebiten.Image, sprite *SpriteInstance) {
+func drawSpriteBox(screen *ebiten.Image, sprite *Sprite) {
 	r := sprite.ScreenRect()
 	if r == nil {
 		return
@@ -365,7 +365,7 @@ func drawSpriteBox(screen *ebiten.Image, sprite *SpriteInstance) {
 	vector.StrokeRect(screen, minX, minY, maxX-minX, maxY-minY, 1, color.RGBA{255, 0, 0, 255}, false)
 }
 
-func drawSpriteIndicator(screen *ebiten.Image, sprite *SpriteInstance) {
+func drawSpriteIndicator(screen *ebiten.Image, sprite *Sprite) {
 	r := sprite.ScreenRect()
 	if r == nil {
 		return
@@ -499,7 +499,7 @@ func (g *Game) updateProjectiles() {
 				g.deleteProjectile(p)
 
 				// make a sprite/wall getting hit by projectile cause some visual effect
-				if p.ImpactEffect.SpriteInstance != nil {
+				if p.ImpactEffect.Sprite != nil {
 					if len(collisions) >= 1 {
 						// use the first collision point to place effect at
 						newPos = collisions[0].collision

@@ -63,7 +63,7 @@ type Camera struct {
 	// zbuffer for sprite casting
 	zBuffer []float64
 	// sprites
-	sprites    []Sprite
+	sprites    []*Sprite
 	spriteLvls []*level
 	//arrays used to sort the sprites
 	spriteOrder    []int
@@ -87,7 +87,7 @@ type Camera struct {
 	// point at which the center of the screen converges (for reticle use)
 	convergenceDistance float64
 	convergencePoint    *Vector3
-	convergenceSprite   Sprite
+	convergenceSprite   *Sprite
 
 	// advanced option to always provide sprite screen rect bounds even when sprite is not being rendered
 	alwaysSetSpriteScreenRect bool
@@ -127,7 +127,7 @@ func NewCamera(width int, height int, texSize int, mapObj Map, tex TextureHandle
 	c.tex = tex
 	c.SetViewSize(width, height)
 
-	c.sprites = []Sprite{}
+	c.sprites = []*Sprite{}
 	c.updateSpriteLevels(16)
 
 	// initialize a pool of channels to limit concurrent floor and sprite casting
@@ -242,7 +242,7 @@ func (c *Camera) SetAlwaysSetSpriteScreenRect(b bool) {
 }
 
 // Update - updates the camera view
-func (c *Camera) Update(sprites []Sprite) {
+func (c *Camera) Update(sprites []*Sprite) {
 	// clear horizontal buffer by making a new one
 	c.floorLvl.initialize(c.w, c.h)
 
@@ -938,6 +938,6 @@ func (c *Camera) GetConvergencePoint() *Vector3 {
 }
 
 // Get the Sprite (or nil if no sprite) at the point of convergence raycasted from the center of the camera view
-func (c *Camera) GetConvergenceSprite() Sprite {
+func (c *Camera) GetConvergenceSprite() *Sprite {
 	return c.convergenceSprite
 }

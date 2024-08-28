@@ -7,9 +7,9 @@ import (
 )
 
 type Crosshairs struct {
-	*SpriteInstance
+	*Sprite
 	hitTimer     int
-	HitIndicator *SpriteInstance
+	HitIndicator *Sprite
 }
 
 func NewCrosshairs(
@@ -18,7 +18,7 @@ func NewCrosshairs(
 	mapColor := color.RGBA{0, 0, 0, 0}
 
 	normalCrosshairs := &Crosshairs{
-		SpriteInstance: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, AnchorCenter, 0, 0),
+		Sprite: NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, crosshairIndex, AnchorCenter, 0, 0),
 	}
 
 	hitCrosshairs := NewSpriteFromSheet(x, y, scale, img, mapColor, columns, rows, hitIndex, AnchorCenter, 0, 0)

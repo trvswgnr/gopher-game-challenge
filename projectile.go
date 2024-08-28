@@ -8,7 +8,7 @@ import (
 )
 
 type Projectile struct {
-	*SpriteInstance
+	*Sprite
 	Ricochets    int
 	Lifespan     float64
 	ImpactEffect Effect
@@ -19,10 +19,10 @@ func NewProjectile(
 	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *Projectile {
 	p := &Projectile{
-		SpriteInstance: NewSprite(x, y, scale, img, mapColor, anchor, collisionRadius, collisionHeight),
-		Ricochets:      0,
-		Lifespan:       math.MaxFloat64,
-		ImpactEffect:   Effect{},
+		Sprite:       NewSprite(x, y, scale, img, mapColor, anchor, collisionRadius, collisionHeight),
+		Ricochets:    0,
+		Lifespan:     math.MaxFloat64,
+		ImpactEffect: Effect{},
 	}
 
 	// projectiles should not be convergence capable by player focal point
@@ -39,10 +39,10 @@ func NewAnimatedProjectile(
 	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
 ) *Projectile {
 	p := &Projectile{
-		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, collisionRadius, collisionHeight),
-		Ricochets:      0,
-		Lifespan:       math.MaxFloat64,
-		ImpactEffect:   Effect{},
+		Sprite:       NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, anchor, collisionRadius, collisionHeight),
+		Ricochets:    0,
+		Lifespan:     math.MaxFloat64,
+		ImpactEffect: Effect{},
 	}
 
 	// projectiles should not be convergence capable by player focal point
@@ -56,9 +56,9 @@ func NewAnimatedProjectile(
 
 func (p *Projectile) SpawnEffect(x, y, z, angle, pitch float64) *Effect {
 	impactEffect := Clone(&p.ImpactEffect)
-	spriteInstance := Clone(p.ImpactEffect.SpriteInstance)
+	spriteInstance := Clone(p.ImpactEffect.Sprite)
 
-	impactEffect.SpriteInstance = spriteInstance
+	impactEffect.Sprite = spriteInstance
 	impactEffect.Position = &Vector2{X: x, Y: y}
 	impactEffect.PositionZ = z
 	impactEffect.Angle = angle

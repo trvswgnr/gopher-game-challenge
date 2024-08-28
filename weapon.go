@@ -7,7 +7,7 @@ import (
 )
 
 type Weapon struct {
-	*SpriteInstance
+	*Sprite
 	firing             bool
 	cooldown           int
 	rateOfFire         float64
@@ -20,7 +20,7 @@ func NewAnimatedWeapon(
 ) *Weapon {
 	mapColor := color.RGBA{0, 0, 0, 0}
 	w := &Weapon{
-		SpriteInstance: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, AnchorCenter, 0, 0),
+		Sprite: NewAnimatedSprite(x, y, scale, animationRate, img, mapColor, columns, rows, AnchorCenter, 0, 0),
 	}
 	w.projectile = projectile
 	w.projectileVelocity = projectileVelocity
@@ -36,7 +36,7 @@ func (w *Weapon) Fire() bool {
 
 		if !w.firing {
 			w.firing = true
-			w.SpriteInstance.ResetAnimation()
+			w.Sprite.ResetAnimation()
 		}
 
 		return true
@@ -46,9 +46,9 @@ func (w *Weapon) Fire() bool {
 
 func (w *Weapon) SpawnProjectile(x, y, z, angle, pitch float64, spawnedBy *Entity) *Projectile {
 	p := Clone(&w.projectile)
-	s := Clone(w.projectile.SpriteInstance)
+	s := Clone(w.projectile.Sprite)
 
-	p.SpriteInstance = s
+	p.Sprite = s
 	p.Position = &Vector2{X: x, Y: y}
 	p.PositionZ = z
 	p.Angle = angle
@@ -75,10 +75,10 @@ func (w *Weapon) Update() {
 	if w.cooldown > 0 {
 		w.cooldown -= 1
 	}
-	if w.firing && w.SpriteInstance.LoopCounter() < 1 {
-		w.SpriteInstance.Update(nil)
+	if w.firing && w.Sprite.LoopCounter() < 1 {
+		w.Sprite.Update(nil)
 	} else {
 		w.firing = false
-		w.SpriteInstance.ResetAnimation()
+		w.Sprite.ResetAnimation()
 	}
 }
