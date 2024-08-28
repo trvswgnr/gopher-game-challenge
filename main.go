@@ -1800,17 +1800,19 @@ type Projectile struct {
 	Ricochets    int
 	Lifespan     float64
 	ImpactEffect Effect
+	Gravity      float64
 }
 
 func NewProjectile(
 	x, y, scale float64, img *ebiten.Image, mapColor color.RGBA,
-	anchor SpriteAnchor, collisionRadius, collisionHeight float64,
+	anchor SpriteAnchor, collisionRadius, collisionHeight, gravity float64,
 ) *Projectile {
 	p := &Projectile{
 		Sprite:       NewSprite(x, y, scale, img, mapColor, anchor, collisionRadius, collisionHeight),
 		Ricochets:    0,
 		Lifespan:     math.MaxFloat64,
 		ImpactEffect: Effect{},
+		Gravity:      gravity,
 	}
 
 	// projectiles should not be convergence capable by player focal point
@@ -2506,7 +2508,7 @@ func (g *Game) loadSprites() {
 	redBoltCollisionHeight := 2 * redBoltCollisionRadius
 	redBoltProjectile := NewProjectile(
 		0, 0, redBoltScale, redBoltImg, reddish,
-		AnchorCenter, redBoltCollisionRadius, redBoltCollisionHeight,
+		AnchorCenter, redBoltCollisionRadius, redBoltCollisionHeight, 0.002,
 	)
 
 	// preload effect sprites
@@ -3298,7 +3300,6 @@ func (g *Game) updatePlayerCamera(forceUpdate bool) {
 }
 
 func (g *Game) updateProjectiles() {
-	// Testing animated projectile movement
 	for p := range g.projectiles {
 		if p.Velocity != 0 {
 
@@ -3307,6 +3308,8 @@ func (g *Game) updateProjectiles() {
 			xCheck := trajectory.X2
 			yCheck := trajectory.Y2
 			zCheck := trajectory.Z2
+
+			zCheck -= p.Gravity
 
 			newPos, isCollision, collisions := g.getValidMove(p.Entity, xCheck, yCheck, zCheck, false)
 			if isCollision || p.PositionZ <= 0 {
@@ -3337,6 +3340,14 @@ func (g *Game) updateProjectiles() {
 			} else {
 				p.Position = newPos
 				p.PositionZ = zCheck
+
+				// Update pitch due to gravity
+				if p.Gravity != 0 {
+					dx := p.Position.X - trajectory.X1
+					dy := p.Position.Y - trajectory.Y1
+					dz := p.PositionZ - trajectory.Z1
+					p.Pitch = math.Atan2(dz, math.Sqrt(dx*dx+dy*dy))
+				}
 			}
 		}
 		p.Update(g.player.Position)
