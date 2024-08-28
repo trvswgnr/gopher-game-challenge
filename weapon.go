@@ -48,10 +48,8 @@ func (w *Weapon) Fire() bool {
 }
 
 func (w *Weapon) SpawnProjectile(x, y, z, angle, pitch float64, spawnedBy *Entity) *Projectile {
-	p := &Projectile{}
-	s := &SpriteInstance{}
-	Copy(p, w.projectile)
-	Copy(s, w.projectile.SpriteInstance)
+	p := Clone(&w.projectile)
+	s := Clone(w.projectile.SpriteInstance)
 
 	p.SpriteInstance = s
 	p.Position = &geom.Vector2{X: x, Y: y}

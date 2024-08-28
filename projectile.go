@@ -58,19 +58,17 @@ func NewAnimatedProjectile(
 }
 
 func (p *Projectile) SpawnEffect(x, y, z, angle, pitch float64) *Effect {
-	e := &Effect{}
-	s := &SpriteInstance{}
-	Copy(e, p.ImpactEffect)
-	Copy(s, p.ImpactEffect.SpriteInstance)
+	impactEffect := Clone(&p.ImpactEffect)
+	spriteInstance := Clone(p.ImpactEffect.SpriteInstance)
 
-	e.SpriteInstance = s
-	e.Position = &geom.Vector2{X: x, Y: y}
-	e.PositionZ = z
-	e.Angle = angle
-	e.Pitch = pitch
+	impactEffect.SpriteInstance = spriteInstance
+	impactEffect.Position = &geom.Vector2{X: x, Y: y}
+	impactEffect.PositionZ = z
+	impactEffect.Angle = angle
+	impactEffect.Pitch = pitch
 
 	// keep track of what spawned it
-	e.Parent = p.Parent
+	impactEffect.Parent = p.Parent
 
-	return e
+	return impactEffect
 }
